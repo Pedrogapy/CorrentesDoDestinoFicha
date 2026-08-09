@@ -65,7 +65,7 @@ export const ATTRIBUTES = [
 export const SKILLS = [
   // Força
   ['athletics', 'Atletismo', 'strength', 'Capacidade de executar esforços físicos ligados a deslocamento, levantamento, corrida, salto, escalada e outras ações atléticas.'],
-  ['fight', 'Lutar', 'strength', 'Treinamento e eficiência em combate corpo a corpo e no uso do próprio corpo para realizar ataques.'],
+  ['fight', 'Lutar', 'strength', 'Treinamento e eficiência em combate corpo a corpo, desarmado ou utilizando armas de combate próximo.'],
   ['grapple', 'Agarrar', 'strength', 'Capacidade de prender, conter ou controlar fisicamente outro corpo e de disputar agarrões.'],
   ['impact', 'Impacto', 'strength', 'Capacidade de aplicar força de maneira concentrada para quebrar, empurrar, deslocar ou afetar fisicamente objetos e estruturas.'],
 
@@ -392,6 +392,15 @@ export function estimateAbilityVP(config = {}) {
   if (config.once_per_mission) vp -= 2;
   if (config.requires_preparation) vp -= 1;
   if (config.meaningful_drawback) vp -= 1;
+
+  // Configurações de execução também alteram o orçamento. Um efeito ofensivo sem
+  // teste para acertar é mais confiável; crítico forçado e margem ampliada são
+  // benefícios relevantes, mas não tornam o golpe elegível a Kokusen.
+  const hasOffensivePayload = Number(config.damage_dice_count || 0) > 0 || Boolean(config.condition_key);
+  if (hasOffensivePayload && config.requires_attack === false) vp += 2;
+  if (config.forced_critical) vp += 2;
+  const threshold = clamp(config.critical_threshold || 20, 2, 20);
+  if (threshold < 20) vp += Math.ceil((20 - threshold) / 2);
 
   return Math.max(1, Math.round(vp));
 }

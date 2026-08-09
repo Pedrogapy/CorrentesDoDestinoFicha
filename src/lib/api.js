@@ -393,3 +393,130 @@ export async function exportCharacterJson(characterId) {
   tables.equipment = equipment.data;
   return tables;
 }
+
+// ============================================================
+// TESTES E MOTOR DE COMBATE v0.4
+// ============================================================
+
+export async function rollGeneralTest({ characterId, label, attributeKey, skillKey, mode='normal', count=1, visibility='public', encounterId=null }) {
+  const { data, error } = await supabase.rpc('roll_general_test', {
+    p_character_id: characterId,
+    p_label: label,
+    p_attribute_key: attributeKey,
+    p_skill_key: skillKey,
+    p_mode: mode,
+    p_count: Number(count) || 1,
+    p_visibility: visibility,
+    p_encounter_id: encounterId,
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function getGeneralRollLogs(characterId=null) {
+  let query = supabase.from('roll_logs').select('*').is('encounter_id', null).order('created_at', { ascending: false }).limit(50);
+  if (characterId) query = query.eq('character_id', characterId);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data || [];
+}
+
+export async function getCombatTargets(encounterId) {
+  const { data, error } = await supabase.rpc('get_combat_targets', { p_encounter_id: encounterId });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function getVisibleCombatActions(encounterId) {
+  const { data, error } = await supabase.rpc('get_visible_combat_actions', { p_encounter_id: encounterId });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function createCombatAttack(payload) {
+  const { data, error } = await supabase.rpc('create_combat_attack', {
+    p_encounter_id: payload.encounterId,
+    p_attacker_character_id: payload.attackerCharacterId,
+    p_target_character_id: payload.targetCharacterId,
+    p_label: payload.label || 'Ataque',
+    p_source_type: payload.sourceType || 'basic',
+    p_source_id: payload.sourceId || null,
+    p_attack_attribute_key: payload.attackAttributeKey || 'strength',
+    p_attack_skill_key: payload.attackSkillKey || 'fight',
+    p_pa_cost: Number(payload.paCost ?? 1),
+    p_ea_cost: Number(payload.eaCost ?? 0),
+    p_uses_cursed_energy: Boolean(payload.usesCursedEnergy),
+    p_forced_critical: Boolean(payload.forcedCritical),
+    p_critical_threshold: Number(payload.criticalThreshold ?? 20),
+    p_damage_dice_count: Number(payload.damageDiceCount ?? 1),
+    p_damage_die: Number(payload.damageDie ?? 6),
+    p_damage_flat_attribute_key: payload.damageFlatAttributeKey || null,
+    p_condition_key: payload.conditionKey || null,
+    p_roll_mode: payload.rollMode || 'normal',
+    p_roll_count: Number(payload.rollCount ?? 1),
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function resolveCombatDefense(actionId, defenseType, mode='normal', count=1) {
+  const { data, error } = await supabase.rpc('resolve_combat_defense', {
+    p_action_id: actionId,
+    p_defense_type: defenseType,
+    p_mode: mode,
+    p_count: Number(count) || 1,
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function createBasicCounterattack(actionId, useCursedEnergy=false) {
+  const { data, error } = await supabase.rpc('create_basic_counterattack', {
+    p_action_id: actionId,
+    p_use_cursed_energy: Boolean(useCursedEnergy),
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function useCombatEffect(payload) {
+  const { data, error } = await supabase.rpc('use_combat_effect', {
+    p_encounter_id: payload.encounterId,
+    p_character_id: payload.characterId,
+    p_target_character_id: payload.targetCharacterId,
+    p_label: payload.label || 'Habilidade',
+    p_source_id: payload.sourceId || null,
+    p_pa_cost: Number(payload.paCost ?? 1),
+    p_ea_cost: Number(payload.eaCost ?? 0),
+    p_damage_dice_count: Number(payload.damageDiceCount ?? 0),
+    p_damage_die: Number(payload.damageDie ?? 0),
+    p_damage_flat_attribute_key: payload.damageFlatAttributeKey || null,
+    p_condition_key: payload.conditionKey || null,
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function startCombatTurn(participantId) {
+  const { data, error } = await supabase.rpc('start_combat_turn', { p_participant_id: participantId });
+  if (error) throw error;
+  return data;
+}
+
+export async function endCombatTurn(participantId) {
+  const { data, error } = await supabase.rpc('end_combat_turn', { p_participant_id: participantId });
+  if (error) throw error;
+  return data;
+}
+
+export async function rollCombatInitiative(participantId) {
+  const { data, error } = await supabase.rpc('roll_combat_initiative', { p_participant_id: participantId });
+  if (error) throw error;
+  return data;
+}
+
+export async function removeCombatCondition(participantId, conditionKey) {
+  const { data, error } = await supabase.rpc('remove_combat_condition', { p_participant_id: participantId, p_condition_key: conditionKey });
+  if (error) throw error;
+  return data;
+}

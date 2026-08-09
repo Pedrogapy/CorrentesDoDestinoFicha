@@ -167,3 +167,19 @@ label { display:grid; gap:6px; font-size:.83rem; font-weight:750; color:#c8c4cc;
   .page-title { align-items:flex-start; flex-direction:column; }
   .stat { min-height:82px; }
 }
+
+/* ============================================================
+   Testes e combate v0.4
+   ============================================================ */
+.skill-actions { display:grid; grid-template-columns:auto 120px; gap:8px; align-items:center; }
+.combat-config-box { border:1px solid #4a3940; background:#130f12; padding:12px; display:grid; gap:10px; }
+.combat-config-box h3 { margin:0; }
+.combat-action.incoming { border-color:#8b313a; box-shadow:inset 4px 0 0 var(--accent); }
+.reaction-panel { margin-top:10px; }
+.compact-stats { gap:8px; }
+.combat-participant .pill { margin-right:4px; }
+@media (max-width: 720px) {
+  .skill-line { grid-template-columns:1fr; }
+  .skill-actions { grid-template-columns:auto 1fr; }
+  .compact-stats { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}

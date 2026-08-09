@@ -25,6 +25,7 @@ import {
   SYSTEM_VERSION,
 } from './lib/system.js';
 import { rollD20 } from './lib/dice.js';
+import { renderTestsPage, quickSkillRoll, renderPlayerCombatPageV2, renderMasterCombatPageV2, abilityCombatConfigFields, equipmentAttackConfigFields } from './lib/combat-ui.js';
 
 const app = document.querySelector('#app');
 
@@ -48,6 +49,7 @@ const state = {
 
 const playerTabs = [
   ['sheet', 'Ficha'],
+  ['tests', 'Testes'],
   ['system', 'Sistema'],
   ['abilities', 'Habilidades'],
   ['training', 'Treino'],
@@ -59,6 +61,7 @@ const playerTabs = [
 
 const masterTabs = [
   ['master', 'Mestre'],
+  ['tests', 'Testes'],
   ['system', 'Sistema'],
   ['combat', 'Combate'],
   ['history', 'Histórico'],
@@ -278,16 +281,21 @@ function renderShell() {
 function renderCurrentPage() {
   switch (state.tab) {
     case 'sheet': return renderSheetPage();
+    case 'tests': return renderTestsPage(combatContext(document.querySelector('#page')));
     case 'system': return renderSystemPage();
     case 'abilities': return renderAbilitiesPage();
     case 'training': return renderTrainingPage();
     case 'vows': return renderVowsPage();
     case 'equipment': return renderEquipmentPage();
-    case 'combat': return state.profile.role === 'master' ? renderMasterCombatPage() : renderPlayerCombatPage();
+    case 'combat': { const ctx=combatContext(document.querySelector('#page')); return state.profile.role === 'master' ? renderMasterCombatPageV2(ctx) : renderPlayerCombatPageV2(ctx); }
     case 'history': return renderHistoryPage();
     case 'master': return renderMasterPage();
     default: return renderSystemPage();
   }
+}
+
+function combatContext(root=document.querySelector('#page')) {
+  return { root, state, pageHeader, esc, getName, withBusy, toast };
 }
 
 function pageHeader(kicker, title, extra = '') {
@@ -377,7 +385,7 @@ function renderCharacterEditor(character, isMasterEditor, root) {
       <div class="section-head"><h2>Perícias</h2><span class="budget ${skillUsed>skillPointBudget(character.level)?'over':''}">${skillUsed}/${skillPointBudget(character.level)} • máx. ${skillCap(character.level)}</span></div>
       ${ATTRIBUTES.map(attr => `<div class="skills-group"><h3>${attr.name}</h3>${SKILLS.filter(s=>s.attribute===attr.key).map(skill=>{
         const v=Number(character.skills?.[skill.key]||0);
-        return `<div class="skill-line"><div><div class="skill-name">${skill.name}</div><div class="skill-desc">${skill.description}</div></div><div class="stepper"><button data-skill-minus="${skill.key}" ${respecLocked?'disabled':''}>−</button><div class="number">${v}</div><button data-skill-plus="${skill.key}" ${respecLocked?'disabled':''}>+</button></div></div>`;
+        return `<div class="skill-line"><div><div class="skill-name">${skill.name}</div><div class="skill-desc">${skill.description}</div></div><div class="skill-actions"><button class="btn ghost" data-quick-skill="${skill.key}" title="Rolar ${skill.name}">🎲</button><div class="stepper"><button data-skill-minus="${skill.key}" ${respecLocked?'disabled':''}>−</button><div class="number">${v}</div><button data-skill-plus="${skill.key}" ${respecLocked?'disabled':''}>+</button></div></div></div>`;
       }).join('')}</div>`).join('')}
     </section>
 
@@ -402,6 +410,7 @@ function renderCharacterEditor(character, isMasterEditor, root) {
   root.querySelectorAll('[data-attr-plus]').forEach(btn=>btn.onclick=()=>{ const k=btn.dataset.attrPlus; const used=ATTRIBUTES.reduce((s,a)=>s+Number(character.attributes[a.key]||0),0); if(used<attributePointBudget(character.level) && character.attributes[k]<attributeCap(character.level)) character.attributes[k]++; rerender(); });
   root.querySelectorAll('[data-skill-minus]').forEach(btn=>btn.onclick=()=>{ const k=btn.dataset.skillMinus; character.skills[k]=Math.max(0,Number(character.skills[k]||0)-1); rerender(); });
   root.querySelectorAll('[data-skill-plus]').forEach(btn=>btn.onclick=()=>{ const k=btn.dataset.skillPlus; const used=SKILLS.reduce((s,a)=>s+Number(character.skills[a.key]||0),0); if(used<skillPointBudget(character.level) && Number(character.skills[k]||0)<skillCap(character.level)) character.skills[k]=Number(character.skills[k]||0)+1; rerender(); });
+  root.querySelectorAll('[data-quick-skill]').forEach(btn=>btn.onclick=()=>quickSkillRoll(character,btn.dataset.quickSkill,combatContext(root)));
   root.querySelectorAll('[data-growth]').forEach(btn=>btn.onclick=()=>{ const key=btn.dataset.growth==='vigor'?'growth_vigor':'growth_reserve'; const delta=Number(btn.dataset.delta); const used=Number(character.growth_vigor||0)+Number(character.growth_reserve||0); if(delta<0) character[key]=Math.max(0,Number(character[key]||0)-1); else if(used<growthPointBudget(character.level)) character[key]=Number(character[key]||0)+1; rerender(); });
 
   if (!isMasterEditor) {
@@ -517,6 +526,7 @@ async function renderAbilitiesPage() {
           <div class="field-row"><label>Duração<select name="duration">${Object.entries(VP_OPTIONS.duration).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')}</select></label><label>Severidade da condição<select name="condition">${Object.entries(VP_OPTIONS.conditionSeverity).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')}</select></label></div><label>Condição aplicada<select name="conditionKey"><option value="">Nenhuma / efeito próprio</option>${state.conditions.map(c=>`<option value="${c.key}">${esc(c.name)}</option>`).join('')}</select></label>
           <div class="field-row"><label><input name="onceCombat" type="checkbox" style="width:auto" /> 1 vez por combate</label><label><input name="onceMission" type="checkbox" style="width:auto" /> 1 vez por missão</label></div>
           <div class="field-row"><label><input name="preparation" type="checkbox" style="width:auto" /> Exige preparação</label><label><input name="drawback" type="checkbox" style="width:auto" /> Desvantagem relevante</label></div>
+          ${abilityCombatConfigFields()}
           <div class="notice" id="vp-preview">VP estimado: 1</div>
           <button class="btn primary">Enviar para aprovação</button>
         </form>
@@ -538,7 +548,7 @@ async function renderAbilitiesPage() {
     const f=new FormData(form);
     return {
       pa_cost:Number(f.get('pa')||0), ea_cost:Number(f.get('ea')||0), damage_die:Number(f.get('die')||0), damage_dice_count:Number(f.get('diceCount')||0),
-      range:f.get('range'), targets:f.get('targets'), duration:f.get('duration'), condition_severity:f.get('condition'), condition_key:f.get('conditionKey')||null, once_per_combat:f.get('onceCombat')==='on', once_per_mission:f.get('onceMission')==='on', requires_preparation:f.get('preparation')==='on', meaningful_drawback:f.get('drawback')==='on',
+      range:f.get('range'), targets:f.get('targets'), duration:f.get('duration'), condition_severity:f.get('condition'), condition_key:f.get('conditionKey')||null, once_per_combat:f.get('onceCombat')==='on', once_per_mission:f.get('onceMission')==='on', requires_preparation:f.get('preparation')==='on', meaningful_drawback:f.get('drawback')==='on', requires_attack:f.get('requiresAttack')==='on', attack_attribute_key:f.get('attackAttribute'), attack_skill_key:f.get('attackSkill'), damage_flat_attribute_key:f.get('damageFlatAttribute')||null, uses_cursed_energy:f.get('usesCursedEnergy')==='on', forced_critical:f.get('forcedCritical')==='on', critical_threshold:Number(f.get('criticalThreshold')||20),
     };
   };
   const updateVp=()=>root.querySelector('#vp-preview').textContent=`VP estimado: ${estimateAbilityVP(getConfig())}`;
@@ -598,8 +608,10 @@ function vowCard(v, master=false) {
 
 async function renderEquipmentPage() {
   const root=document.querySelector('#page'); const items=await withBusy(()=>api.getEquipment(state.character.id));
-  root.innerHTML=`${pageHeader('Objetos e ferramentas', 'Inventário')}<section class="grid grid-2"><div class="card"><h2>Novo item</h2><form id="equipment-form" class="grid"><label>Nome<input name="name" required /></label><div class="field-row"><label>Tipo<input name="type" value="Comum" /></label><label>Grau<input name="grade" value="Sem Grau" /></label></div><label>Descrição<textarea name="description"></textarea></label><label>Mecânica<textarea name="mechanics"></textarea></label><button class="btn primary">Adicionar</button></form></div><div class="card"><h2>Equipamentos</h2><div class="list">${items.length?items.map(i=>`<div class="list-item"><div class="title">${esc(i.name)}</div><div class="meta">${esc(i.equipment_type)} • ${esc(i.grade)}</div><div class="body">${esc(i.description)}${i.mechanics?`\n\n${esc(i.mechanics)}`:''}</div></div>`).join(''):'<p class="muted">Nenhum item.</p>'}</div></div></section>`;
-  root.querySelector('#equipment-form').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);await withBusy(()=>api.addEquipment({character_id:state.character.id,name:f.get('name'),equipment_type:f.get('type'),grade:f.get('grade'),description:f.get('description'),mechanics:f.get('mechanics')}),'Item adicionado.');renderEquipmentPage();};
+  root.innerHTML=`${pageHeader('Objetos e ferramentas', 'Inventário')}<section class="grid grid-2"><div class="card"><h2>Novo item</h2><form id="equipment-form" class="grid"><label>Nome<input name="name" required /></label><div class="field-row"><label>Tipo<input name="type" value="Comum" /></label><label>Grau<input name="grade" value="Sem Grau" /></label></div><label>Descrição<textarea name="description"></textarea></label><label>Mecânica<textarea name="mechanics"></textarea></label>${equipmentAttackConfigFields()}<button class="btn primary">Adicionar</button></form></div><div class="card"><h2>Equipamentos</h2><div class="list">${items.length?items.map(i=>`<div class="list-item"><div class="title">${esc(i.name)}</div><div class="meta">${esc(i.equipment_type)} • ${esc(i.grade)} ${i.attack_config?.enabled?'• ataque configurado':''}</div><div class="body">${esc(i.description)}${i.mechanics?`
+
+${esc(i.mechanics)}`:''}</div></div>`).join(''):'<p class="muted">Nenhum item.</p>'}</div></div></section>`;
+  root.querySelector('#equipment-form').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);const attack_config={enabled:f.get('attackEnabled')==='on',attack_attribute_key:f.get('attackAttribute'),attack_skill_key:f.get('attackSkill'),pa_cost:Number(f.get('attackPa')||1),ea_cost:Number(f.get('attackEa')||0),damage_die:Number(f.get('attackDie')||8),damage_dice_count:Number(f.get('attackDiceCount')||1),damage_flat_attribute_key:f.get('damageFlatAttribute')||null,uses_cursed_energy:f.get('usesCursedEnergy')==='on',critical_threshold:20,forced_critical:false};await withBusy(()=>api.addEquipment({character_id:state.character.id,name:f.get('name'),equipment_type:f.get('type'),grade:f.get('grade'),description:f.get('description'),mechanics:f.get('mechanics'),attack_config}),'Item adicionado.');renderEquipmentPage();};
 }
 
 async function renderHistoryPage() {
@@ -683,6 +695,7 @@ async function renderMasterSecret(root,character){
           <div class="field-row"><label>Duração<select name="duration">${Object.entries(VP_OPTIONS.duration).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')}</select></label><label>Condição<select name="condition">${Object.entries(VP_OPTIONS.conditionSeverity).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')}</select></label></div>
           <label>Condição do compêndio<select name="conditionKey"><option value="">Nenhuma</option>${state.conditions.map(c=>`<option value="${c.key}">${esc(c.name)}</option>`).join('')}</select></label>
           <div class="field-row"><label><input name="onceCombat" type="checkbox" style="width:auto" /> 1x combate</label><label><input name="onceMission" type="checkbox" style="width:auto" /> 1x missão</label></div>
+          ${abilityCombatConfigFields()}
           <div class="notice" id="master-vp-preview">VP estimado: 1</div>
           <label>VP final aprovado<input name="vpApproved" type="number" min="1" value="1" /></label>
           <label><input name="override" type="checkbox" style="width:auto" /> Ignorar limite normal (somente exceção narrativa do mestre)</label>
@@ -693,18 +706,18 @@ async function renderMasterSecret(root,character){
     </div>
 
     <div style="height:14px"></div>
-    <div class="master-zone"><h2>Equipamentos da entidade</h2><div class="grid grid-2"><form id="master-equipment-form" class="card grid"><label>Nome<input name="name" required /></label><div class="field-row"><label>Tipo<input name="type" value="Comum" /></label><label>Grau<input name="grade" value="Sem Grau" /></label></div><label>Descrição<textarea name="description"></textarea></label><label>Mecânica<textarea name="mechanics"></textarea></label><button class="btn">Adicionar equipamento</button></form><div class="card"><div class="list">${items.length?items.map(i=>`<div class="list-item"><div class="title">${esc(i.name)}</div><div class="meta">${esc(i.equipment_type)} • ${esc(i.grade)}</div><div class="body">${esc(i.description)}${i.mechanics?`\n\n${esc(i.mechanics)}`:''}</div></div>`).join(''):'<p class="muted">Nenhum equipamento.</p>'}</div></div></div></div>`;
+    <div class="master-zone"><h2>Equipamentos da entidade</h2><div class="grid grid-2"><form id="master-equipment-form" class="card grid"><label>Nome<input name="name" required /></label><div class="field-row"><label>Tipo<input name="type" value="Comum" /></label><label>Grau<input name="grade" value="Sem Grau" /></label></div><label>Descrição<textarea name="description"></textarea></label><label>Mecânica<textarea name="mechanics"></textarea></label>${equipmentAttackConfigFields()}<button class="btn">Adicionar equipamento</button></form><div class="card"><div class="list">${items.length?items.map(i=>`<div class="list-item"><div class="title">${esc(i.name)}</div><div class="meta">${esc(i.equipment_type)} • ${esc(i.grade)}</div><div class="body">${esc(i.description)}${i.mechanics?`\n\n${esc(i.mechanics)}`:''}</div></div>`).join(''):'<p class="muted">Nenhum equipamento.</p>'}</div></div></div></div>`;
 
   root.querySelector('#save-secret').onclick=async()=>{await withBusy(()=>api.saveMasterSecret(character.id,root.querySelector('#secret-text').value),'Segredo salvo.');};
   root.querySelector('#track-form').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);await withBusy(()=>api.upsertMasterProgress({character_id:character.id,key:f.get('key'),title:f.get('title'),current_points:Number(f.get('current')||0),target_points:f.get('target')===''?null:Number(f.get('target')),master_notes:f.get('notes'),reward_notes:f.get('reward')}),'Progresso oculto salvo.');renderMasterSecret(root,character);};
 
   const abilityForm=root.querySelector('#master-ability-form');
-  const configFromMasterAbility=()=>{const f=new FormData(abilityForm);return {pa_cost:Number(f.get('pa')||0),ea_cost:Number(f.get('ea')||0),damage_die:Number(f.get('die')||0),damage_dice_count:Number(f.get('diceCount')||0),range:f.get('range'),targets:f.get('targets'),duration:f.get('duration'),condition_severity:f.get('condition'),condition_key:f.get('conditionKey')||null,once_per_combat:f.get('onceCombat')==='on',once_per_mission:f.get('onceMission')==='on'};};
+  const configFromMasterAbility=()=>{const f=new FormData(abilityForm);return {pa_cost:Number(f.get('pa')||0),ea_cost:Number(f.get('ea')||0),damage_die:Number(f.get('die')||0),damage_dice_count:Number(f.get('diceCount')||0),range:f.get('range'),targets:f.get('targets'),duration:f.get('duration'),condition_severity:f.get('condition'),condition_key:f.get('conditionKey')||null,once_per_combat:f.get('onceCombat')==='on',once_per_mission:f.get('onceMission')==='on',requires_attack:f.get('requiresAttack')==='on',attack_attribute_key:f.get('attackAttribute'),attack_skill_key:f.get('attackSkill'),damage_flat_attribute_key:f.get('damageFlatAttribute')||null,uses_cursed_energy:f.get('usesCursedEnergy')==='on',forced_critical:f.get('forcedCritical')==='on',critical_threshold:Number(f.get('criticalThreshold')||20)};};
   const updateMasterVp=()=>{const vp=estimateAbilityVP(configFromMasterAbility());root.querySelector('#master-vp-preview').textContent=`VP estimado: ${vp}`;const field=abilityForm.elements.vpApproved;if(!field.dataset.touched)field.value=vp;};
   abilityForm.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',()=>{if(el.name==='vpApproved')el.dataset.touched='1';updateMasterVp();}));
   updateMasterVp();
   abilityForm.onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);const config=configFromMasterAbility();const estimated=estimateAbilityVP(config);await withBusy(()=>api.createAbility({character_id:character.id,category:f.get('category'),name:f.get('name'),description:f.get('description'),mechanics:f.get('mechanics'),config,vp_estimated:estimated,vp_approved:Number(f.get('vpApproved')||estimated),limit_override:f.get('override')==='on',status:'approved'}),'Habilidade criada.');renderMasterSecret(root,character);};
-  root.querySelector('#master-equipment-form').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);await withBusy(()=>api.addEquipment({character_id:character.id,name:f.get('name'),equipment_type:f.get('type'),grade:f.get('grade'),description:f.get('description'),mechanics:f.get('mechanics')}),'Equipamento adicionado.');renderMasterSecret(root,character);};
+  root.querySelector('#master-equipment-form').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);const attack_config={enabled:f.get('attackEnabled')==='on',attack_attribute_key:f.get('attackAttribute'),attack_skill_key:f.get('attackSkill'),pa_cost:Number(f.get('attackPa')||1),ea_cost:Number(f.get('attackEa')||0),damage_die:Number(f.get('attackDie')||8),damage_dice_count:Number(f.get('attackDiceCount')||1),damage_flat_attribute_key:f.get('damageFlatAttribute')||null,uses_cursed_energy:f.get('usesCursedEnergy')==='on',critical_threshold:20,forced_critical:false};await withBusy(()=>api.addEquipment({character_id:character.id,name:f.get('name'),equipment_type:f.get('type'),grade:f.get('grade'),description:f.get('description'),mechanics:f.get('mechanics'),attack_config}),'Equipamento adicionado.');renderMasterSecret(root,character);};
   bindConditionLinks(root);
 }
 
