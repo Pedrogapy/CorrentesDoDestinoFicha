@@ -96,21 +96,21 @@ function participantCard(p, ctx, editable=false) {
   </div>`;
 }
 
-async function bindCommonCombatButtons(root, ctx, rerender) {
+async function bindCommonCombatButtons(root, ctx, encounterId, rerender) {
   const { toast, withBusy }=ctx;
   root.querySelectorAll('[data-defense]').forEach(btn=>btn.onclick=async()=>{
     const actionId=btn.dataset.action; const type=btn.dataset.defense;
-    await withBusy(()=>api.resolveCombatDefense(actionId,type,'normal',1),type==='accept'?'Golpe resolvido.':'Reação resolvida.');
+    await withBusy(()=>api.resolveCombatDefense(actionId,type,'normal',1,encounterId),type==='accept'?'Golpe resolvido.':'Reação resolvida.');
     rerender();
   });
   root.querySelectorAll('[data-counter]').forEach(btn=>btn.onclick=async()=>{
     const id=btn.dataset.counter; const useEA=Boolean(root.querySelector(`[data-counter-ea="${id}"]`)?.checked);
-    await withBusy(()=>api.createBasicCounterattack(id,useEA),'Contra-ataque realizado.');rerender();
+    await withBusy(()=>api.createBasicCounterattack(id,useEA,encounterId),'Contra-ataque realizado.');rerender();
   });
-  root.querySelectorAll('[data-roll-init]').forEach(btn=>btn.onclick=async()=>{const total=await withBusy(()=>api.rollCombatInitiative(btn.dataset.rollInit));toast(`Iniciativa: ${total}`,'good');rerender();});
-  root.querySelectorAll('[data-start-turn]').forEach(btn=>btn.onclick=async()=>{await withBusy(()=>api.startCombatTurn(btn.dataset.startTurn),'Turno iniciado.');rerender();});
-  root.querySelectorAll('[data-end-turn]').forEach(btn=>btn.onclick=async()=>{await withBusy(()=>api.endCombatTurn(btn.dataset.endTurn),'Turno encerrado.');rerender();});
-  root.querySelectorAll('[data-remove-condition]').forEach(btn=>btn.onclick=async()=>{await withBusy(()=>api.removeCombatCondition(btn.dataset.removeCondition,btn.dataset.condition),'Condição removida.');rerender();});
+  root.querySelectorAll('[data-roll-init]').forEach(btn=>btn.onclick=async()=>{const total=await withBusy(()=>api.rollCombatInitiative(btn.dataset.rollInit,encounterId));toast(`Iniciativa: ${total}`,'good');rerender();});
+  root.querySelectorAll('[data-start-turn]').forEach(btn=>btn.onclick=async()=>{await withBusy(()=>api.startCombatTurn(btn.dataset.startTurn,encounterId),'Turno iniciado.');rerender();});
+  root.querySelectorAll('[data-end-turn]').forEach(btn=>btn.onclick=async()=>{await withBusy(()=>api.endCombatTurn(btn.dataset.endTurn,encounterId),'Turno encerrado.');rerender();});
+  root.querySelectorAll('[data-remove-condition]').forEach(btn=>btn.onclick=async()=>{await withBusy(()=>api.removeCombatCondition(btn.dataset.removeCondition,btn.dataset.condition,encounterId),'Condição removida.');rerender();});
 }
 
 async function executeAbility(ability, actorId, encounterId, targetId, ctx) {
@@ -237,15 +237,29 @@ export async function renderPlayerCombatPageV2(ctx) {
     root.querySelectorAll('[data-use-equipment]').forEach(btn=>btn.onclick=async()=>{const i=attackEquipment.find(x=>x.id===btn.dataset.useEquipment);const target=root.querySelector(`[data-equipment-target="${i.id}"]`).value;const reinforce=Boolean(root.querySelector(`[data-equipment-reinforce="${i.id}"]`)?.checked);const twoHanded=Boolean(root.querySelector(`[data-equipment-two-hands="${i.id}"]`)?.checked);await withBusy(()=>executeEquipment(i,state.character.id,active.id,target,reinforce,twoHanded),'Ataque realizado.');renderPlayerCombatPageV2(ctx);});
     root.querySelectorAll('[data-use-equipment-effect]').forEach(btn=>btn.onclick=async()=>{const item=usableEquipment.find(x=>x.id===btn.dataset.itemId);const effect=(item.effects||[]).find(e=>String(e.id)===String(btn.dataset.useEquipmentEffect));const target=root.querySelector(`[data-equipment-effect-target="${btn.dataset.useEquipmentEffect}"][data-item-id="${item.id}"]`).value;await withBusy(()=>executeEquipmentEffect(item,effect,state.character.id,active.id,target),'Efeito do equipamento usado.');renderPlayerCombatPageV2(ctx);});
   }
-  await bindCommonCombatButtons(root,ctx,()=>renderPlayerCombatPageV2(ctx));
+  await bindCommonCombatButtons(root,ctx,active.id,()=>renderPlayerCombatPageV2(ctx));
 }
 
 export async function renderMasterCombatPageV2(ctx) {
   const { root, state, pageHeader, esc, getName, withBusy, toast }=ctx;
   const encounters=await api.getEncounters(); state.activeEncounter=encounters.find(e=>e.status==='active')||null; state.masterCharacters=await api.listAllCharacters();
-  if(!state.activeEncounter){root.innerHTML=`${pageHeader('Controle secreto','Combate')}<section class="card"><h2>Novo combate</h2><form id="encounter-form" class="field-row"><label>Nome<input name="name" required /></label><button class="btn primary" style="align-self:end">Criar combate</button></form></section>`;root.querySelector('#encounter-form').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);await withBusy(()=>api.createEncounter(f.get('name')),'Combate criado.');renderMasterCombatPageV2(ctx);};return;}
+  if(!state.activeEncounter){
+    const lastUndo=await api.getLatestCombatUndo(null).catch(()=>null);
+    const canReopen=lastUndo?.encounter_status==='ended';
+    root.innerHTML=`${pageHeader('Controle secreto','Combate')}
+      ${canReopen?`<section class="card"><div class="btn-row"><div><h2 style="margin:0">Último combate encerrado</h2><div class="muted small">${esc(lastUndo.encounter_name)} • última ação: ${esc(lastUndo.label)}</div></div><button class="btn warn" id="undo-ended-combat">Desfazer encerramento</button></div><div class="notice" style="margin-top:10px">Restaura o combate exatamente ao estado anterior ao encerramento, incluindo PS, EA, PA, condições, rolagens, ações e cargas.</div></section><div style="height:14px"></div>`:''}
+      <section class="card"><h2>Novo combate</h2><form id="encounter-form" class="field-row"><label>Nome<input name="name" required /></label><button class="btn primary" style="align-self:end">Criar combate</button></form></section>`;
+    root.querySelector('#undo-ended-combat')?.addEventListener('click',async()=>{
+      if(!confirm(`Desfazer "${lastUndo.label}" e reabrir ${lastUndo.encounter_name}?`)) return;
+      const label=await withBusy(()=>api.undoLastCombatAction(lastUndo.encounter_id),'Combate restaurado.');
+      toast(`Desfeito: ${label}`,'good');
+      renderMasterCombatPageV2(ctx);
+    });
+    root.querySelector('#encounter-form').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);await withBusy(()=>api.createEncounter(f.get('name')),'Combate criado.');renderMasterCombatPageV2(ctx);};
+    return;
+  }
   const active=state.activeEncounter;
-  const [participants,targets,actions]=await Promise.all([api.getCombatParticipants(active.id),api.getCombatTargets(active.id),api.getVisibleCombatActions(active.id)]);
+  const [participants,targets,actions,lastUndo]=await Promise.all([api.getCombatParticipants(active.id),api.getCombatTargets(active.id),api.getVisibleCombatActions(active.id),api.getLatestCombatUndo(active.id).catch(()=>null)]);
   state.encounterParticipants=participants;
   const inCombat=new Set(participants.map(p=>p.character_id));
   state.combatActorId = participants.some(p=>p.character_id===state.combatActorId)?state.combatActorId:participants[0]?.character_id;
@@ -254,12 +268,19 @@ export async function renderMasterCombatPageV2(ctx) {
   const approvedAbilities=abilities.filter(a=>a.status==='approved'); const usableEquipment=equipment.filter(i=>i.status==='approved'&&(i.equipped||i.category==='consumable')); const attackEquipment=usableEquipment.filter(i=>i.equipped&&equipmentDefaults(i).enabled); const effectEquipment=usableEquipment.flatMap(i=>(Array.isArray(i.effects)?i.effects:[]).filter(e=>['active','reaction','attack'].includes(e.type)).map(effect=>({item:i,effect}))); const passiveEquipment=equipment.filter(i=>i.status==='approved'&&i.equipped).flatMap(i=>(Array.isArray(i.effects)?i.effects:[]).filter(e=>e.type==='passive').map(effect=>({item:i,effect}))); const offHandFree=!equipment.some(i=>i.status==='approved'&&i.equipped&&i.equip_slot==='off_hand');
   const targetOpts=actor?targetOptions(targets,actor.id):'';
   root.innerHTML=`${pageHeader(`Rodada ${active.round}`,'Combate do Mestre','<span class="pill bad">Rolagens do Mestre ficam ocultas para jogadores</span>')}
-    <section class="card combat-master-controls"><div class="btn-row"><div><strong>${esc(active.name)}</strong><div class="muted small">Combate ativo. Você pode encerrá-lo mesmo com uma reação pendente.</div></div><button class="btn bad" id="end-encounter">Encerrar combate</button></div></section>
+    <section class="card combat-master-controls"><div class="btn-row"><div><strong>${esc(active.name)}</strong><div class="muted small">Combate ativo. Você pode encerrá-lo mesmo com uma reação pendente.</div>${lastUndo?`<div class="muted small" style="margin-top:4px">Última ação desfazível: <strong>${esc(lastUndo.label)}</strong></div>`:'<div class="muted small" style="margin-top:4px">Ainda não há ação para desfazer.</div>'}</div><div class="btn-row"><button class="btn warn" id="undo-combat" ${lastUndo?'':'disabled'}>Desfazer última ação</button><button class="btn bad" id="end-encounter">Encerrar combate</button></div></div><div class="notice" style="margin-top:10px">Desfazer restaura o estado anterior da última ação: PS, EA, PA, dano, condições, iniciativa, Fluxo Negro, contra-ataques, rolagens e cargas consumidas. Pode ser usado várias vezes, uma ação por vez.</div></section>
     <div style="height:14px"></div>
     <section class="grid grid-2"><div class="card"><h2>Participantes</h2><div class="list">${participants.map(p=>participantCard(p,ctx,true)).join('')||'<p class="muted">Vazio.</p>'}</div><h3>Adicionar</h3><div class="btn-row">${state.masterCharacters.filter(c=>!inCombat.has(c.id)).map(c=>`<button class="btn" data-add-combat="${c.id}">${esc(getName(c))}</button>`).join('')}</div></div>
     <div class="card"><h2>Ações do Mestre</h2>${actor?`<label>Entidade ativa<select id="master-actor">${participants.map(p=>`<option value="${p.character_id}" ${p.character_id===actor.id?'selected':''}>${esc(getName(p.characters))}</option>`).join('')}</select></label><form id="master-basic" class="grid" style="margin-top:10px"><h3>Golpe corpo a corpo</h3><label>Alvo<select name="target">${targetOpts}</select></label><label style="display:flex;align-items:center;gap:7px"><input name="cursed" type="checkbox" style="width:auto" /> Reforçar com 1 EA</label><button class="btn bad">Atacar em segredo</button></form><hr style="border-color:#333"><form id="master-skill" class="grid"><h3>Teste secreto</h3><label>Perícia<select name="skill">${optionList(SKILLS)}</select></label>${modeFields('')}<button class="btn bad">Rolar em segredo</button></form>`:'<p class="muted">Adicione participantes.</p>'}</div></section>
     ${actor?`<div style="height:14px"></div><section class="grid grid-2"><div class="card"><h2>Habilidades de ${esc(getName(actor))}</h2><div class="list">${approvedAbilities.map(a=>{const c=sourceDefaults(a);return `<div class="list-item"><div class="title">${esc(a.name)}</div><div class="meta">${c.paCost} PA • ${c.eaCost} EA</div><label>Alvo<select data-master-ability-target="${a.id}">${targetOpts}<option value="${actor.id}">${esc(getName(actor))}</option></select></label><button class="btn bad" data-master-use-ability="${a.id}" style="margin-top:8px">Usar</button></div>`}).join('')||'<p class="muted">Nenhuma habilidade aprovada.</p>'}</div></div><div class="card"><h2>Equipamentos equipados</h2><div class="list">${attackEquipment.map(i=>{const c=equipmentDefaults(i);const base=weaponDamageProfile(i.weapon_profile||'standard',false);const canTwo=i.weapon_profile==='standard'&&i.equip_slot==='main_hand'&&offHandFree;return `<div class="list-item"><div class="title">${esc(i.name)}</div><div class="meta">${base.paCost} PA • ${base.damageDiceCount}d${base.damageDie}${canTwo?' • 2 mãos: 1d10':''}</div><label>Alvo<select data-master-equipment-target="${i.id}">${targetOpts}</select></label>${canTwo?`<label style="display:flex;align-items:center;gap:7px;margin-top:8px"><input type="checkbox" data-master-equipment-two-hands="${i.id}" style="width:auto" /> Empunhar com duas mãos neste ataque</label>`:''}${!c.usesCursedEnergy?`<label style="display:flex;align-items:center;gap:7px;margin-top:8px"><input type="checkbox" data-master-equipment-reinforce="${i.id}" style="width:auto" /> Conduzir +1 EA</label>`:''}<button class="btn bad" data-master-use-equipment="${i.id}" style="margin-top:8px">Atacar</button></div>`}).join('')||'<p class="muted">Nenhuma arma equipada.</p>'}${effectEquipment.map(({item,effect})=>{const c=equipmentEffectCombatDefaults(effect);return `<div class="list-item"><div class="title">${esc(item.name)} • ${esc(effect.name)}</div><div class="meta">${c.paCost} PA • ${c.eaCost} EA${c.chargesCost?` • ${c.chargesCost} carga(s)`:''}</div><label>Alvo<select data-master-equipment-effect-target="${esc(effect.id)}" data-item-id="${item.id}">${targetOpts}<option value="${actor.id}">${esc(getName(actor))}</option></select></label><button class="btn bad" data-master-use-equipment-effect="${esc(effect.id)}" data-item-id="${item.id}" style="margin-top:8px">Usar efeito</button></div>`}).join('')}${passiveEquipment.map(({item,effect})=>`<div class="list-item"><div class="title">${esc(item.name)} • ${esc(effect.name)}</div><span class="pill good">Passivo equipado</span><div class="body" style="margin-top:6px">${esc(effect.mechanics||effect.description||'')}</div></div>`).join('')}</div></div></section>`:''}
     <div style="height:14px"></div><section class="card"><h2>Ações e reações</h2><div class="list">${actions.map(a=>actionCard(a,ctx)).join('')||'<p class="muted">Nenhuma ação.</p>'}</div></section>`;
+  root.querySelector('#undo-combat')?.addEventListener('click',async()=>{
+    if(!lastUndo) return;
+    if(!confirm(`Desfazer a última ação do combate?\n\n${lastUndo.label}\n\nTudo que essa ação gastou ou causou será restaurado ao estado anterior.`)) return;
+    const label=await withBusy(()=>api.undoLastCombatAction(active.id),'Ação desfeita.');
+    toast(`Desfeito: ${label}`,'good');
+    renderMasterCombatPageV2(ctx);
+  });
   root.querySelector('#end-encounter')?.addEventListener('click',async()=>{
     if(!confirm('Encerrar este combate? As fichas permanecem salvas e o histórico não será apagado.')) return;
     await withBusy(()=>api.endEncounter(active.id),'Combate encerrado.');
@@ -268,14 +289,14 @@ export async function renderMasterCombatPageV2(ctx) {
     renderMasterCombatPageV2(ctx);
   });
   root.querySelectorAll('[data-add-combat]').forEach(btn=>btn.onclick=async()=>{const c=state.masterCharacters.find(x=>x.id===btn.dataset.addCombat);await withBusy(()=>api.addCombatParticipant(active.id,c),'Participante adicionado.');renderMasterCombatPageV2(ctx);});
-  root.querySelectorAll('[data-save-combat]').forEach(btn=>btn.onclick=async()=>{const id=btn.dataset.saveCombat;await withBusy(()=>api.updateCombatParticipant(id,{current_ps:Number(root.querySelector(`[data-cps="${id}"]`).value),current_ea:Number(root.querySelector(`[data-cea="${id}"]`).value),current_pa:Number(root.querySelector(`[data-cpa="${id}"]`).value)}),'Recursos atualizados.');renderMasterCombatPageV2(ctx);});
+  root.querySelectorAll('[data-save-combat]').forEach(btn=>btn.onclick=async()=>{const id=btn.dataset.saveCombat;await withBusy(()=>api.updateCombatParticipant(id,{current_ps:Number(root.querySelector(`[data-cps="${id}"]`).value),current_ea:Number(root.querySelector(`[data-cea="${id}"]`).value),current_pa:Number(root.querySelector(`[data-cpa="${id}"]`).value)},active.id),'Recursos atualizados.');renderMasterCombatPageV2(ctx);});
   root.querySelector('#master-actor')?.addEventListener('change',e=>{state.combatActorId=e.target.value;renderMasterCombatPageV2(ctx);});
   root.querySelector('#master-basic')?.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.currentTarget);await withBusy(()=>api.createCombatAttack({encounterId:active.id,attackerCharacterId:actor.id,targetCharacterId:f.get('target'),label:'Golpe corpo a corpo',sourceType:'basic',attackAttributeKey:'strength',attackSkillKey:'fight',paCost:1,eaCost:f.get('cursed')==='on'?1:0,usesCursedEnergy:f.get('cursed')==='on',damageDiceCount:1,damageDie:6,damageFlatAttributeKey:'strength'}),'Ataque secreto realizado.');renderMasterCombatPageV2(ctx);});
   root.querySelector('#master-skill')?.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.currentTarget);const skill=SKILL_BY_KEY[f.get('skill')];const result=await withBusy(()=>api.rollGeneralTest({characterId:actor.id,label:skill.name,attributeKey:skill.attribute,skillKey:skill.key,mode:f.get('mode'),count:Number(f.get('count')||2),visibility:'master',encounterId:active.id}));toast(`Rolagem secreta: ${result.total}`,'good');renderMasterCombatPageV2(ctx);});
   root.querySelectorAll('[data-master-use-ability]').forEach(btn=>btn.onclick=async()=>{const a=approvedAbilities.find(x=>x.id===btn.dataset.masterUseAbility);const target=root.querySelector(`[data-master-ability-target="${a.id}"]`).value;await withBusy(()=>executeAbility(a,actor.id,active.id,target,ctx),'Habilidade usada.');renderMasterCombatPageV2(ctx);});
   root.querySelectorAll('[data-master-use-equipment]').forEach(btn=>btn.onclick=async()=>{const i=attackEquipment.find(x=>x.id===btn.dataset.masterUseEquipment);const target=root.querySelector(`[data-master-equipment-target="${i.id}"]`).value;const reinforce=Boolean(root.querySelector(`[data-master-equipment-reinforce="${i.id}"]`)?.checked);const twoHanded=Boolean(root.querySelector(`[data-master-equipment-two-hands="${i.id}"]`)?.checked);await withBusy(()=>executeEquipment(i,actor.id,active.id,target,reinforce,twoHanded),'Ataque realizado.');renderMasterCombatPageV2(ctx);});
   root.querySelectorAll('[data-master-use-equipment-effect]').forEach(btn=>btn.onclick=async()=>{const item=usableEquipment.find(x=>x.id===btn.dataset.itemId);const effect=(item.effects||[]).find(e=>String(e.id)===String(btn.dataset.masterUseEquipmentEffect));const target=root.querySelector(`[data-master-equipment-effect-target="${btn.dataset.masterUseEquipmentEffect}"][data-item-id="${item.id}"]`).value;await withBusy(()=>executeEquipmentEffect(item,effect,actor.id,active.id,target),'Efeito do equipamento usado.');renderMasterCombatPageV2(ctx);});
-  await bindCommonCombatButtons(root,ctx,()=>renderMasterCombatPageV2(ctx));
+  await bindCommonCombatButtons(root,ctx,active.id,()=>renderMasterCombatPageV2(ctx));
 }
 
 export function abilityCombatConfigFields() {

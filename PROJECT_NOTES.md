@@ -107,3 +107,15 @@ Regras canônicas implementadas no site:
 - Passivos usam a duração própria "Enquanto equipado".
 - Equipamentos podem ser excluídos pelo dono da ficha ou pelo Mestre, com confirmação na interface.
 - O Mestre pode criar exceções narrativas de VP com override explícito.
+
+## Desfazer ações de combate - v0.6.1
+
+- O painel do Mestre possui **Desfazer última ação**.
+- Antes de cada mutação relevante do combate é criado um snapshot; ele só vira desfazível se a ação terminar com sucesso.
+- O Mestre pode desfazer várias vezes em sequência, sempre uma ação por vez (até 50 snapshots por combate).
+- A restauração recupera: PS, EA, PA, condições, iniciativa, estado derrotado, contador de contra-ataques, Fluxo Negro, desconto de Fluxo Negro, ações, reações, rolagens e cargas de equipamentos consumidas.
+- Ataque e defesa são passos separados: desfazer a defesa volta o ataque para `pending_defense`; desfazer novamente remove o ataque e devolve os custos dele.
+- Encerrar combate também é desfazível. Se o Mestre encerrar sem querer, o painel sem combate ativo oferece **Desfazer encerramento** para reabrir o encontro no estado anterior.
+- Apenas o Mestre pode restaurar snapshots. Jogadores podem gerar snapshots ao realizar suas próprias ações, mas não conseguem ler o conteúdo nem usar o undo.
+- O undo não altera mudanças de inventário feitas fora do fluxo de combate (equipar/desequipar/excluir); ele restaura apenas cargas consumidas por ações de combate.
+- Não existe "Refazer" nesta versão.
