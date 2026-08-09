@@ -24,7 +24,6 @@ import {
   estimateAbilityVP,
   SYSTEM_VERSION,
 } from './lib/system.js';
-import { rollD20 } from './lib/dice.js';
 import { renderTestsPage, quickSkillRoll, renderPlayerCombatPageV2, renderMasterCombatPageV2, abilityCombatConfigFields } from './lib/combat-ui.js';
 import { renderPlayerEquipmentPage, renderMasterEquipmentManager, pendingEquipmentQueueHtml, bindPendingEquipmentQueue } from './lib/equipment-ui.js';
 
@@ -280,6 +279,10 @@ function renderShell() {
 }
 
 function renderCurrentPage() {
+  if (state.tab !== 'combat' && state.realtimeChannel) {
+    supabase.removeChannel(state.realtimeChannel);
+    state.realtimeChannel = null;
+  }
   switch (state.tab) {
     case 'sheet': return renderSheetPage();
     case 'tests': return renderTestsPage(combatContext(document.querySelector('#page')));
@@ -296,7 +299,7 @@ function renderCurrentPage() {
 }
 
 function combatContext(root=document.querySelector('#page')) {
-  return { root, state, pageHeader, esc, getName, withBusy, toast };
+  return { root, state, pageHeader, esc, getName, withBusy, toast, subscribeCombatRealtime };
 }
 
 function pageHeader(kicker, title, extra = '') {
@@ -733,33 +736,6 @@ async function renderMasterSecret(root,character){
   bindConditionLinks(root);
 }
 
-async function renderPlayerCombatPage(){
-  const root=document.querySelector('#page');const encounters=await api.getEncounters();const active=encounters.find(e=>e.status==='active');
-  if(!active){subscribeCombatRealtime(null,()=>{});root.innerHTML=`${pageHeader('Sala de combate','Combate')}<div class="notice">Nenhum combate ativo.</div>`;return;}
-  subscribeCombatRealtime(active.id, renderPlayerCombatPage);
-  const participants=await api.getCombatParticipants(active.id);const mine=participants.find(p=>p.character_id===state.character.id);const rolls=await api.getRollLogs(active.id);
-  root.innerHTML=`${pageHeader(`Rodada ${active.round}`,'Combate')}<section class="grid grid-2"><div class="card"><h2>${esc(active.name)}</h2>${mine?combatParticipantCard(mine,false):'<p class="muted">Seu personagem ainda não foi adicionado.</p>'}</div><div class="card"><h2>Rolagem</h2><form id="player-roll" class="grid"><label>Perícia<select name="skill">${SKILLS.map(s=>`<option value="${s.key}">${s.name}</option>`).join('')}</select></label><button class="btn primary">Rolar d20</button></form><div class="list" style="margin-top:10px">${rolls.map(r=>rollCard(r)).join('')}</div></div></section>`;
-  root.querySelector('#player-roll').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);const skill=SKILLS.find(s=>s.key===f.get('skill'));const bonus=attributeModifier(state.character.attributes[skill.attribute])+Number(state.character.skills[skill.key]||0);const r=rollD20({bonus});await api.logRoll({encounter_id:active.id,character_id:state.character.id,label:skill.name,roll_type:'skill',expression:'1d20',rolls:r.rolls,natural_roll:r.natural,bonus:r.bonus,total:r.total,is_critical:r.naturalCritical,kokusen_eligible:r.kokusenEligible,visibility:'public'});toast(`${skill.name}: ${r.total}`,'good');renderPlayerCombatPage();};
-}
-
-function combatParticipantCard(p,master){
-  const c=p.characters;const d=characterDerived(c);return `<div class="list-item"><div class="title">${esc(getName(c))}</div><div class="meta">Iniciativa ${p.initiative}</div><div class="grid grid-3" style="margin-top:10px"><div><span class="muted small">PS</span><div><strong>${p.current_ps??d.ps}</strong> / ${d.ps}</div></div><div><span class="muted small">EA</span><div><strong>${p.current_ea??d.ea}</strong> / ${d.ea}</div></div><div><span class="muted small">PA</span><div><strong>${p.current_pa??d.pa}</strong> / ${d.pa}</div></div></div>${master?`<div class="field-row-3" style="margin-top:10px"><label>PS<input data-cps="${p.id}" type="number" value="${p.current_ps??d.ps}" /></label><label>EA<input data-cea="${p.id}" type="number" value="${p.current_ea??d.ea}" /></label><label>PA<input data-cpa="${p.id}" type="number" value="${p.current_pa??d.pa}" /></label></div><button class="btn" data-save-combat="${p.id}" style="margin-top:8px">Salvar recursos</button>`:''}</div>`;
-}
-
-function rollCard(r){return `<div class="list-item"><div class="title">${esc(r.label)}: ${r.total}</div><div class="meta">${esc(r.expression)} • dados ${esc(JSON.stringify(r.rolls))} ${r.is_critical?'• CRÍTICO':''}</div></div>`;}
-
-async function renderMasterCombatPage(){
-  const root=document.querySelector('#page');const encounters=await api.getEncounters();state.activeEncounter=encounters.find(e=>e.status==='active')||null;state.masterCharacters=await api.listAllCharacters();
-  if(!state.activeEncounter){subscribeCombatRealtime(null,()=>{});root.innerHTML=`${pageHeader('Controle secreto','Combate')}<section class="card"><h2>Novo combate</h2><form id="encounter-form" class="field-row"><label>Nome<input name="name" required /></label><button class="btn primary" style="align-self:end">Criar combate</button></form></section>`;root.querySelector('#encounter-form').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);await api.createEncounter(f.get('name'));renderMasterCombatPage();};return;}
-  subscribeCombatRealtime(state.activeEncounter.id, renderMasterCombatPage);
-  state.encounterParticipants=await api.getCombatParticipants(state.activeEncounter.id);const rolls=await api.getRollLogs(state.activeEncounter.id);
-  const inCombat=new Set(state.encounterParticipants.map(p=>p.character_id));
-  root.innerHTML=`${pageHeader(`Rodada ${state.activeEncounter.round}`,'Combate do Mestre',`<span class="pill bad">Rolagens do mestre são secretas</span>`)}<section class="grid grid-2"><div class="card"><h2>Participantes</h2><div class="list">${state.encounterParticipants.map(p=>combatParticipantCard(p,true)).join('')||'<p class="muted">Vazio.</p>'}</div><h3>Adicionar</h3><div class="btn-row">${state.masterCharacters.filter(c=>!inCombat.has(c.id)).map(c=>`<button class="btn" data-add-combat="${c.id}">${esc(getName(c))}</button>`).join('')}</div></div><div class="card"><h2>Rolagem secreta</h2><form id="master-roll" class="grid"><label>Entidade<select name="character">${state.encounterParticipants.map(p=>`<option value="${p.character_id}">${esc(getName(p.characters))}</option>`).join('')}</select></label><label>Perícia<select name="skill">${SKILLS.map(s=>`<option value="${s.key}">${s.name}</option>`).join('')}</select></label><label>Dados de desvantagem<input name="disadvantage" type="number" min="1" max="10" value="1" /></label><button class="btn bad">Rolar em segredo</button></form><h3>Log do mestre</h3><div class="list">${rolls.map(rollCard).join('')}</div></div></section>`;
-  root.querySelectorAll('[data-add-combat]').forEach(btn=>btn.onclick=async()=>{const c=state.masterCharacters.find(x=>x.id===btn.dataset.addCombat);await api.addCombatParticipant(state.activeEncounter.id,c);renderMasterCombatPage();});
-  root.querySelectorAll('[data-save-combat]').forEach(btn=>btn.onclick=async()=>{const id=btn.dataset.saveCombat;await api.updateCombatParticipant(id,{current_ps:Number(root.querySelector(`[data-cps="${id}"]`).value),current_ea:Number(root.querySelector(`[data-cea="${id}"]`).value),current_pa:Number(root.querySelector(`[data-cpa="${id}"]`).value)});toast('Recursos atualizados.','good');});
-  root.querySelector('#master-roll').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);const p=state.encounterParticipants.find(x=>x.character_id===f.get('character'));const skill=SKILLS.find(s=>s.key===f.get('skill'));const c=p.characters;const bonus=attributeModifier(c.attributes[skill.attribute])+Number(c.skills[skill.key]||0);const r=rollD20({bonus,disadvantageDice:Number(f.get('disadvantage')||1)});await api.logRoll({encounter_id:state.activeEncounter.id,character_id:c.id,label:skill.name,roll_type:'skill',expression:`${r.rolls.length}d20 menor`,rolls:r.rolls,natural_roll:r.natural,bonus:r.bonus,total:r.total,is_critical:r.naturalCritical,kokusen_eligible:r.kokusenEligible,visibility:'master'});toast(`Rolagem secreta: ${r.total}`,'good');renderMasterCombatPage();};
-}
-
 function subscribeCombatRealtime(encounterId, rerender) {
   if (state.realtimeChannel) {
     supabase.removeChannel(state.realtimeChannel);
@@ -768,6 +744,8 @@ function subscribeCombatRealtime(encounterId, rerender) {
   if (!encounterId) return;
   let timer;
   const refresh = () => {
+    // Não força a tela de combate se o usuário já navegou para outra aba.
+    if (state.tab !== 'combat') return;
     clearTimeout(timer);
     timer = setTimeout(() => rerender(), 180);
   };

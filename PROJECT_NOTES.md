@@ -119,3 +119,20 @@ Regras canônicas implementadas no site:
 - Apenas o Mestre pode restaurar snapshots. Jogadores podem gerar snapshots ao realizar suas próprias ações, mas não conseguem ler o conteúdo nem usar o undo.
 - O undo não altera mudanças de inventário feitas fora do fluxo de combate (equipar/desequipar/excluir); ele restaura apenas cargas consumidas por ações de combate.
 - Não existe "Refazer" nesta versão.
+
+## Controle de turnos - v0.6.2
+
+- O combate agora possui um único `active_participant_id` por encontro.
+- Somente o Mestre pode **iniciar turno**. Jogadores não possuem mais botão para iniciar o próprio turno.
+- Ao iniciar, o PA da entidade volta ao máximo, o contador de contra-ataques é reiniciado e o desconto de Fluxo Negro do novo turno é liberado, mantendo a regra já existente de início de turno.
+- Enquanto nenhum turno estiver ativo, ataques, habilidades, efeitos ativos e testes vinculados ao combate ficam bloqueados.
+- Enquanto um turno estiver ativo, apenas a entidade daquele turno pode iniciar ações normais. O Mestre também fica preso à entidade em turno no painel secreto para evitar ações acidentais com outro NPC/personagem.
+- Defesas, reações e contra-ataques continuam permitidos fora do turno próprio.
+- O jogador vê em tempo real **Sua vez, Nome!** quando o Mestre inicia seu turno. Nos outros momentos vê quem está agindo ou que aguarda o Mestre.
+- O jogador ou o Mestre podem **encerrar o turno ativo**. Encerrar turno não consome PA nem EA.
+- Não é permitido iniciar outro turno nem encerrar o atual enquanto houver uma defesa/reação `pending_defense` sem resolução.
+- Iniciar turno e encerrar turno geram snapshots do sistema de Desfazer. Desfazer `Encerrar turno` restaura inclusive qual participante estava ativo, PA/EA/PS e todos os demais estados já cobertos pelo undo.
+- A restauração v0.6.2 foi ajustada para o FK de `active_participant_id`: participantes são restaurados antes de reativar o turno capturado.
+- Jogadores só podem remover condições manualmente durante o próprio turno; o Mestre mantém controle administrativo a qualquer momento.
+- Rolagem de iniciativa continua disponível antes do turno porque é preparação do combate, não uma ação de turno.
+- Realtime da tela V2 foi conectado ao `combatContext`, portanto iniciar/encerrar/desfazer turno atualiza automaticamente a tela do jogador e do Mestre.

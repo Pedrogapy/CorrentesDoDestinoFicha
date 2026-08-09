@@ -443,7 +443,7 @@ export async function endEncounter(encounterId) {
   return withCombatUndo(encounterId, 'Encerrar combate', async()=>{
     const { data, error } = await supabase
       .from('combat_encounters')
-      .update({ status: 'ended', ended_at: new Date().toISOString() })
+      .update({ status: 'ended', ended_at: new Date().toISOString(), active_participant_id: null, turn_started_at: null })
       .eq('id', encounterId)
       .select('*')
       .single();
@@ -626,22 +626,25 @@ export async function useCombatEffect(payload) {
       p_damage_die: Number(payload.damageDie ?? 0),
       p_damage_flat_attribute_key: payload.damageFlatAttributeKey || null,
       p_condition_key: payload.conditionKey || null,
+      p_is_reaction: Boolean(payload.isReaction),
     });
     if (error) throw error;
     return data;
   });
 }
 
-export async function startCombatTurn(participantId, encounterId=null) {
-  return withCombatUndo(encounterId, 'Iniciar turno', async()=>{
+export async function startCombatTurn(participantId, encounterId=null, displayName='') {
+  const label=displayName ? `Iniciar turno: ${displayName}` : 'Iniciar turno';
+  return withCombatUndo(encounterId, label, async()=>{
     const { data, error } = await supabase.rpc('start_combat_turn', { p_participant_id: participantId });
     if (error) throw error;
     return data;
   });
 }
 
-export async function endCombatTurn(participantId, encounterId=null) {
-  return withCombatUndo(encounterId, 'Encerrar turno', async()=>{
+export async function endCombatTurn(participantId, encounterId=null, displayName='') {
+  const label=displayName ? `Encerrar turno: ${displayName}` : 'Encerrar turno';
+  return withCombatUndo(encounterId, label, async()=>{
     const { data, error } = await supabase.rpc('end_combat_turn', { p_participant_id: participantId });
     if (error) throw error;
     return data;
