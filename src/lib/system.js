@@ -9,7 +9,7 @@
  * - Não expor sistemas narrativamente secretos em telas de jogador apenas por estarem implementados no banco.
  */
 
-export const SYSTEM_VERSION = '0.3.0';
+export const SYSTEM_VERSION = '0.5.0';
 
 export const ATTRIBUTES = [
   {
@@ -134,6 +134,121 @@ export const ENTITY_TYPES = [
 ];
 
 export const GRADE_OPTIONS = ['Sem Grau', 'Grau 4', 'Grau 3', 'Grau 2', 'Grau 1', 'Grau Especial'];
+
+
+// ============================================================
+// EQUIPAMENTOS / FERRAMENTAS AMALDIÇOADAS
+// ============================================================
+
+export const EQUIPMENT_CATEGORIES = [
+  { key: 'weapon', name: 'Arma' },
+  { key: 'accessory', name: 'Amuleto / Acessório' },
+  { key: 'armor', name: 'Roupa / Armadura' },
+  { key: 'consumable', name: 'Consumível' },
+  { key: 'other', name: 'Outro' },
+];
+
+export const EQUIPMENT_SLOTS = [
+  { key: 'main_hand', name: 'Mão principal', categories: ['weapon'] },
+  { key: 'off_hand', name: 'Mão secundária', categories: ['weapon'] },
+  { key: 'body', name: 'Corpo', categories: ['armor'] },
+  { key: 'accessory_1', name: 'Acessório 1', categories: ['accessory'] },
+  { key: 'accessory_2', name: 'Acessório 2', categories: ['accessory'] },
+];
+
+/**
+ * O dano básico de uma arma é parte do perfil físico da arma e NÃO consome VP.
+ * Poderes sobrenaturais ficam em effects[] e usam o orçamento do grau.
+ */
+export const WEAPON_PROFILES = {
+  light: {
+    name: 'Leve',
+    damageDiceCount: 1,
+    damageDie: 6,
+    paCost: 1,
+    handsMin: 1,
+    handsMax: 1,
+    description: '1d6 + modificador. 1 PA. Uma mão.',
+  },
+  standard: {
+    name: 'Padrão',
+    damageDiceCount: 1,
+    damageDie: 8,
+    paCost: 1,
+    handsMin: 1,
+    handsMax: 2,
+    description: '1d8 + modificador. 1 PA. Uma ou duas mãos.',
+  },
+  heavy: {
+    name: 'Pesada',
+    damageDiceCount: 1,
+    damageDie: 10,
+    paCost: 1,
+    handsMin: 2,
+    handsMax: 2,
+    description: '1d10 + modificador. 1 PA. Exige duas mãos.',
+  },
+  very_heavy: {
+    name: 'Muito pesada',
+    damageDiceCount: 1,
+    damageDie: 12,
+    paCost: 2,
+    handsMin: 2,
+    handsMax: 2,
+    description: '1d12 + modificador. 2 PA. Exige duas mãos.',
+  },
+};
+
+export const EQUIPMENT_GRADE_VP = {
+  'Sem Grau': 0,
+  'Grau 4': 2,
+  'Grau 3': 4,
+  'Grau 2': 6,
+  'Grau 1': 9,
+  'Grau Especial': 12,
+};
+
+export function equipmentVpBudget(grade, isCursed = true) {
+  if (!isCursed) return 0;
+  return EQUIPMENT_GRADE_VP[grade] ?? 0;
+}
+
+export function equipmentEffectsVp(effects = []) {
+  return (Array.isArray(effects) ? effects : []).reduce((sum, effect) => sum + Math.max(0, Number(effect?.vp) || 0), 0);
+}
+
+export function equipmentCategoryName(key) {
+  return EQUIPMENT_CATEGORIES.find((item) => item.key === key)?.name || key || 'Outro';
+}
+
+export function equipmentSlotName(key) {
+  return EQUIPMENT_SLOTS.find((item) => item.key === key)?.name || key || 'Não equipado';
+}
+
+export function weaponAttackConfig({
+  profile = 'standard',
+  attackAttributeKey = 'strength',
+  attackSkillKey = 'fight',
+  damageAttributeKey = attackAttributeKey,
+  range = 'melee',
+} = {}) {
+  const p = WEAPON_PROFILES[profile] || WEAPON_PROFILES.standard;
+  return {
+    enabled: true,
+    attack_attribute_key: attackAttributeKey,
+    attack_skill_key: attackSkillKey,
+    pa_cost: p.paCost,
+    ea_cost: 0,
+    damage_die: p.damageDie,
+    damage_dice_count: p.damageDiceCount,
+    damage_flat_attribute_key: damageAttributeKey || null,
+    uses_cursed_energy: false,
+    critical_threshold: 20,
+    forced_critical: false,
+    range,
+    allow_cursed_reinforcement: true,
+  };
+}
 
 export function clamp(value, min, max) {
   return Math.min(max, Math.max(min, Number(value) || 0));

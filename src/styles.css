@@ -183,3 +183,22 @@ label { display:grid; gap:6px; font-size:.83rem; font-weight:750; color:#c8c4cc;
   .skill-actions { grid-template-columns:auto 1fr; }
   .compact-stats { grid-template-columns:repeat(2,minmax(0,1fr)); }
 }
+
+/* ============================================================
+   Equipamentos e Ferramentas Amaldiçoadas v0.5
+   ============================================================ */
+.equipment-card { overflow: hidden; }
+.equipment-card-head { display:flex; align-items:flex-start; gap:10px; }
+.equipment-card-head > div:last-child { flex:1; min-width:0; }
+.equipment-thumb { width:72px; height:72px; object-fit:cover; border:1px solid var(--line); background:#0c0c0f; flex:0 0 auto; }
+.equipment-details > summary { cursor:pointer; font-weight:800; letter-spacing:.02em; }
+.equipment-details[open] > summary { margin-bottom:10px; }
+.equipment-effect { margin-top:6px; }
+.equipment-create-form .combat-config-box,
+.equipment-effect-form .combat-config-box { margin-top:4px; }
+
+@media (max-width: 720px) {
+  .equipment-card-head { align-items:center; }
+  .equipment-thumb { width:58px; height:58px; }
+  .equipment-card .btn-row { gap:6px; }
+}

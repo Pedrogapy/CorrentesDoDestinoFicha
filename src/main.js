@@ -25,7 +25,8 @@ import {
   SYSTEM_VERSION,
 } from './lib/system.js';
 import { rollD20 } from './lib/dice.js';
-import { renderTestsPage, quickSkillRoll, renderPlayerCombatPageV2, renderMasterCombatPageV2, abilityCombatConfigFields, equipmentAttackConfigFields } from './lib/combat-ui.js';
+import { renderTestsPage, quickSkillRoll, renderPlayerCombatPageV2, renderMasterCombatPageV2, abilityCombatConfigFields } from './lib/combat-ui.js';
+import { renderPlayerEquipmentPage, renderMasterEquipmentManager, pendingEquipmentQueueHtml, bindPendingEquipmentQueue } from './lib/equipment-ui.js';
 
 const app = document.querySelector('#app');
 
@@ -498,6 +499,16 @@ function renderSystemPage() {
       <div class="card"><h2>Pontos de Ação</h2><p>PA são universais e podem ser gastos em ações, técnicas e reações. PA não usados permanecem até o início do próximo turno e então são redefinidos ao máximo.</p></div>
     </section>
     <div style="height:14px"></div>
+    <section class="card"><h2>Equipamentos e Ferramentas Amaldiçoadas</h2>
+      <p><strong>Golpe corpo a corpo:</strong> continua disponível mesmo sem arma e causa 1d6 + Mod. Força por 1 PA.</p>
+      <p><strong>Perfis de arma:</strong> Leve 1d6/1 PA; Padrão 1d8/1 PA; Pesada 1d10/1 PA e duas mãos; Muito pesada 1d12/2 PA e duas mãos.</p>
+      <p><strong>VP:</strong> o ataque físico básico da arma não consome VP. Somente efeitos sobrenaturais usam o orçamento: Grau 4 = 2 VP, Grau 3 = 4 VP, Grau 2 = 6 VP, Grau 1 = 9 VP, Grau Especial = 12 VP base.</p>
+      <p><strong>Acerto:</strong> o Grau da ferramenta não fornece bônus automático. O ataque continua usando Atributo + Perícia.</p>
+      <p><strong>Kokusen:</strong> uma arma amaldiçoada não torna o golpe elegível sozinha. É necessário conduzir Energia Amaldiçoada no ataque.</p>
+      <p><strong>Equipar:</strong> há mão principal, mão secundária, corpo e dois slots de acessório. O item precisa estar aprovado e equipado para liberar ataques e efeitos ativos em combate.</p>
+      <p class="muted">Ferramentas amaldiçoadas propostas por jogadores ficam pendentes até aprovação do Mestre.</p>
+    </section>
+    <div style="height:14px"></div>
     <section class="card"><h2>Condições</h2><div class="list">${state.conditions.length?state.conditions.map(c=>`<div class="list-item"><div class="title">${esc(c.name)}</div><div class="body">${esc(c.description)}</div></div>`).join(''):'<p class="muted">Nenhuma condição cadastrada.</p>'}</div></section>
   `;
 }
@@ -607,11 +618,7 @@ function vowCard(v, master=false) {
 }
 
 async function renderEquipmentPage() {
-  const root=document.querySelector('#page'); const items=await withBusy(()=>api.getEquipment(state.character.id));
-  root.innerHTML=`${pageHeader('Objetos e ferramentas', 'Inventário')}<section class="grid grid-2"><div class="card"><h2>Novo item</h2><form id="equipment-form" class="grid"><label>Nome<input name="name" required /></label><div class="field-row"><label>Tipo<input name="type" value="Comum" /></label><label>Grau<input name="grade" value="Sem Grau" /></label></div><label>Descrição<textarea name="description"></textarea></label><label>Mecânica<textarea name="mechanics"></textarea></label>${equipmentAttackConfigFields()}<button class="btn primary">Adicionar</button></form></div><div class="card"><h2>Equipamentos</h2><div class="list">${items.length?items.map(i=>`<div class="list-item"><div class="title">${esc(i.name)}</div><div class="meta">${esc(i.equipment_type)} • ${esc(i.grade)} ${i.attack_config?.enabled?'• ataque configurado':''}</div><div class="body">${esc(i.description)}${i.mechanics?`
-
-${esc(i.mechanics)}`:''}</div></div>`).join(''):'<p class="muted">Nenhum item.</p>'}</div></div></section>`;
-  root.querySelector('#equipment-form').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);const attack_config={enabled:f.get('attackEnabled')==='on',attack_attribute_key:f.get('attackAttribute'),attack_skill_key:f.get('attackSkill'),pa_cost:Number(f.get('attackPa')||1),ea_cost:Number(f.get('attackEa')||0),damage_die:Number(f.get('attackDie')||8),damage_dice_count:Number(f.get('attackDiceCount')||1),damage_flat_attribute_key:f.get('damageFlatAttribute')||null,uses_cursed_energy:f.get('usesCursedEnergy')==='on',critical_threshold:20,forced_critical:false};await withBusy(()=>api.addEquipment({character_id:state.character.id,name:f.get('name'),equipment_type:f.get('type'),grade:f.get('grade'),description:f.get('description'),mechanics:f.get('mechanics'),attack_config}),'Item adicionado.');renderEquipmentPage();};
+  return renderPlayerEquipmentPage(combatContext(document.querySelector('#page')));
 }
 
 async function renderHistoryPage() {
@@ -623,7 +630,7 @@ async function renderHistoryPage() {
 async function renderMasterPage() {
   const root=document.querySelector('#page');
   state.masterCharacters=await withBusy(()=>api.listAllCharacters());
-  const [tickets,vows,requests] = await Promise.all([api.getTrainingTickets(),api.getVows(),api.getMasterRequests()]);
+  const [tickets,vows,requests,pendingEquipment] = await Promise.all([api.getTrainingTickets(),api.getVows(),api.getMasterRequests(),api.listPendingEquipment()]);
   const pendingAbilitiesResult=await supabase.from('abilities').select('*, characters(first_name,last_name)').eq('status','pending').order('created_at');
   const pendingAbilities=pendingAbilitiesResult.data||[];
   root.innerHTML=`
@@ -640,6 +647,8 @@ async function renderMasterPage() {
       <div class="card"><h2>Fila de habilidades</h2><div class="list">${pendingAbilities.length?pendingAbilities.map(a=>`<div class="list-item"><div class="title">${esc(a.name)}</div><div class="meta">${esc(getName(a.characters))} • VP estimado ${a.vp_estimated}</div><div class="body">${esc(a.description)}\n${esc(a.mechanics)}</div><div class="field-row" style="margin-top:8px"><label>VP aprovado<input type="number" min="1" value="${a.vp_estimated}" data-vp-approved="${a.id}" /></label><label>Resposta<input data-ability-response="${a.id}" /></label></div><div class="btn-row" style="margin-top:8px"><button class="btn good" data-approve-ability="${a.id}">Aprovar</button><button class="btn bad" data-reject-ability="${a.id}">Rejeitar</button></div></div>`).join(''):'<p class="muted">Nada pendente.</p>'}</div></div>
     </section>
     <div style="height:14px"></div>
+    <section class="card"><h2>Fila de equipamentos amaldiçoados</h2><div class="list">${pendingEquipmentQueueHtml(pendingEquipment,esc,getName)}</div></section>
+    <div style="height:14px"></div>
     <section class="grid grid-2"><div class="card"><h2>Treinamentos pendentes</h2><div class="list">${tickets.filter(t=>t.status==='pending').map(t=>trainingCard(t,true)).join('')||'<p class="muted">Nada pendente.</p>'}</div></div><div class="card"><h2>Votos</h2><div class="list">${vows.map(v=>vowCard(v,true)).join('')||'<p class="muted">Nenhum voto.</p>'}</div></div></section>
     <div style="height:14px"></div><section class="card"><h2>Notas ao mestre</h2><div class="list">${requests.filter(r=>r.status==='pending').map(r=>`<div class="list-item"><div class="title">${esc(r.title)}</div><div class="meta">${esc(getName(r.characters))}</div><div class="body">${esc(r.message)}</div><div class="field-row" style="margin-top:8px"><label>Resposta<input data-request-response="${r.id}" /></label><div class="btn-row" style="align-self:end"><button class="btn good" data-request-answer="${r.id}">Responder</button><button class="btn bad" data-request-reject="${r.id}">Rejeitar</button></div></div></div>`).join('')||'<p class="muted">Nada pendente.</p>'}</div></section>
     <div style="height:14px"></div><section class="card"><h2>Condições do sistema</h2><div class="grid grid-2"><form id="condition-form" class="grid"><label>Chave técnica<input name="key" placeholder="ex: frozen" required /></label><label>Nome<input name="name" required /></label><label>Descrição<textarea name="description" required></textarea></label><button class="btn primary">Adicionar / atualizar</button></form><div class="list">${state.conditions.map(c=>`<div class="list-item"><div class="title">${esc(c.name)}</div><div class="body">${esc(c.description)}</div><button class="btn bad" data-condition-disable="${c.id}">Desativar</button></div>`).join('')}</div></div></section>
@@ -655,6 +664,7 @@ async function renderMasterPage() {
   root.querySelectorAll('[data-master-vow]').forEach(btn=>btn.onclick=async()=>{await withBusy(()=>api.setVowStatus(btn.dataset.masterVow,btn.dataset.status),'Voto atualizado.');renderMasterPage();});
   root.querySelectorAll('[data-approve-ability]').forEach(btn=>btn.onclick=async()=>{const id=btn.dataset.approveAbility;const vp=Number(root.querySelector(`[data-vp-approved="${id}"]`)?.value||1);const response=root.querySelector(`[data-ability-response="${id}"]`)?.value||'';const ability=pendingAbilities.find(a=>a.id===id);const {error}=await supabase.from('abilities').update({status:'approved',vp_approved:vp,master_response:response,limit_override:ability?.category==='domain'}).eq('id',id);if(error)return toast(error.message,'bad');toast('Habilidade aprovada.','good');renderMasterPage();});
   root.querySelectorAll('[data-reject-ability]').forEach(btn=>btn.onclick=async()=>{const id=btn.dataset.rejectAbility;const response=root.querySelector(`[data-ability-response="${id}"]`)?.value||prompt('Resposta:')||'';const {error}=await supabase.from('abilities').update({status:'rejected',master_response:response}).eq('id',id);if(error)return toast(error.message,'bad');toast('Habilidade rejeitada.','good');renderMasterPage();});
+  bindPendingEquipmentQueue(root,pendingEquipment,combatContext(root),renderMasterPage);
   root.querySelector('#condition-form').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);await withBusy(()=>api.upsertSystemCondition({key:String(f.get('key')).trim(),name:String(f.get('name')).trim(),description:String(f.get('description')).trim(),active:true}),'Condição salva.');state.conditions=await api.getSystemConditions();renderMasterPage();};
   root.querySelectorAll('[data-condition-disable]').forEach(btn=>btn.onclick=async()=>{await withBusy(()=>api.deactivateSystemCondition(btn.dataset.conditionDisable),'Condição desativada.');state.conditions=await api.getSystemConditions();renderMasterPage();});
   root.querySelectorAll('[data-request-answer]').forEach(btn=>btn.onclick=async()=>{const id=btn.dataset.requestAnswer;const response=root.querySelector(`[data-request-response="${id}"]`)?.value||'';await withBusy(()=>api.resolveMasterRequest(id,'answered',response),'Solicitação respondida.');renderMasterPage();});
@@ -670,11 +680,10 @@ async function renderMasterPage() {
 }
 
 async function renderMasterSecret(root,character){
-  const [secret,tracks,abilities,items]=await Promise.all([
+  const [secret,tracks,abilities]=await Promise.all([
     api.getMasterSecret(character.id),
     api.listMasterProgress(character.id),
     api.getAbilities(character.id),
-    api.getEquipment(character.id),
   ]);
   const budgets=slotBudget(character.level);
   root.innerHTML=`<div style="height:14px"></div>
@@ -706,7 +715,7 @@ async function renderMasterSecret(root,character){
     </div>
 
     <div style="height:14px"></div>
-    <div class="master-zone"><h2>Equipamentos da entidade</h2><div class="grid grid-2"><form id="master-equipment-form" class="card grid"><label>Nome<input name="name" required /></label><div class="field-row"><label>Tipo<input name="type" value="Comum" /></label><label>Grau<input name="grade" value="Sem Grau" /></label></div><label>Descrição<textarea name="description"></textarea></label><label>Mecânica<textarea name="mechanics"></textarea></label>${equipmentAttackConfigFields()}<button class="btn">Adicionar equipamento</button></form><div class="card"><div class="list">${items.length?items.map(i=>`<div class="list-item"><div class="title">${esc(i.name)}</div><div class="meta">${esc(i.equipment_type)} • ${esc(i.grade)}</div><div class="body">${esc(i.description)}${i.mechanics?`\n\n${esc(i.mechanics)}`:''}</div></div>`).join(''):'<p class="muted">Nenhum equipamento.</p>'}</div></div></div></div>`;
+    <div id="master-equipment-manager"></div>`;
 
   root.querySelector('#save-secret').onclick=async()=>{await withBusy(()=>api.saveMasterSecret(character.id,root.querySelector('#secret-text').value),'Segredo salvo.');};
   root.querySelector('#track-form').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);await withBusy(()=>api.upsertMasterProgress({character_id:character.id,key:f.get('key'),title:f.get('title'),current_points:Number(f.get('current')||0),target_points:f.get('target')===''?null:Number(f.get('target')),master_notes:f.get('notes'),reward_notes:f.get('reward')}),'Progresso oculto salvo.');renderMasterSecret(root,character);};
@@ -717,7 +726,7 @@ async function renderMasterSecret(root,character){
   abilityForm.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',()=>{if(el.name==='vpApproved')el.dataset.touched='1';updateMasterVp();}));
   updateMasterVp();
   abilityForm.onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);const config=configFromMasterAbility();const estimated=estimateAbilityVP(config);await withBusy(()=>api.createAbility({character_id:character.id,category:f.get('category'),name:f.get('name'),description:f.get('description'),mechanics:f.get('mechanics'),config,vp_estimated:estimated,vp_approved:Number(f.get('vpApproved')||estimated),limit_override:f.get('override')==='on',status:'approved'}),'Habilidade criada.');renderMasterSecret(root,character);};
-  root.querySelector('#master-equipment-form').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);const attack_config={enabled:f.get('attackEnabled')==='on',attack_attribute_key:f.get('attackAttribute'),attack_skill_key:f.get('attackSkill'),pa_cost:Number(f.get('attackPa')||1),ea_cost:Number(f.get('attackEa')||0),damage_die:Number(f.get('attackDie')||8),damage_dice_count:Number(f.get('attackDiceCount')||1),damage_flat_attribute_key:f.get('damageFlatAttribute')||null,uses_cursed_energy:f.get('usesCursedEnergy')==='on',critical_threshold:20,forced_critical:false};await withBusy(()=>api.addEquipment({character_id:character.id,name:f.get('name'),equipment_type:f.get('type'),grade:f.get('grade'),description:f.get('description'),mechanics:f.get('mechanics'),attack_config}),'Equipamento adicionado.');renderMasterSecret(root,character);};
+  await renderMasterEquipmentManager(root.querySelector('#master-equipment-manager'),character,combatContext(root),()=>renderMasterSecret(root,character));
   bindConditionLinks(root);
 }
 

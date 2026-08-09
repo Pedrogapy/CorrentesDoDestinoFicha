@@ -205,13 +205,63 @@ export async function setVowStatus(id, status) {
 }
 
 export async function getEquipment(characterId) {
-  const { data, error } = await supabase.from('equipment').select('*').eq('character_id', characterId).order('created_at');
+  const { data, error } = await supabase.from('equipment').select('*').eq('character_id', characterId).order('equipped', { ascending: false }).order('created_at');
   if (error) throw error;
   return data || [];
 }
 
 export async function addEquipment(payload) {
   const { data, error } = await supabase.from('equipment').insert(payload).select('*').single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateEquipment(id, changes) {
+  const { data, error } = await supabase.from('equipment').update(changes).eq('id', id).select('*').single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteEquipment(id) {
+  const { error } = await supabase.from('equipment').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function listPendingEquipment() {
+  const { data, error } = await supabase
+    .from('equipment')
+    .select('*, characters(first_name,last_name)')
+    .eq('status', 'pending')
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function setEquipmentStatus(id, status, masterResponse='') {
+  const { data, error } = await supabase
+    .from('equipment')
+    .update({ status, master_response: masterResponse })
+    .eq('id', id)
+    .select('*')
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function equipEquipment(id, slot) {
+  const { data, error } = await supabase.rpc('equip_equipment', { p_item_id: id, p_slot: slot });
+  if (error) throw error;
+  return data;
+}
+
+export async function unequipEquipment(id) {
+  const { data, error } = await supabase.rpc('unequip_equipment', { p_item_id: id });
+  if (error) throw error;
+  return data;
+}
+
+export async function spendEquipmentCharges(id, amount=1) {
+  const { data, error } = await supabase.rpc('spend_equipment_charges', { p_item_id: id, p_amount: Number(amount) || 0 });
   if (error) throw error;
   return data;
 }

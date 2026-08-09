@@ -84,3 +84,19 @@ Expansões de domínio são desenvolvimento narrativo/técnico e não são dadas
 ## Fase de testes
 
 Depois do site funcionar, criar **Souta Minazuki** pelo próprio painel do mestre como primeiro teste completo do criador de NPCs. Não inserir a ficha dele manualmente no banco só para contornar problemas: qualquer incômodo encontrado deve ser corrigido no criador/sistema.
+
+## Equipamentos e Ferramentas Amaldiçoadas - v0.5
+
+Regras canônicas implementadas no site:
+
+- Categorias: Arma, Amuleto/Acessório, Roupa/Armadura, Consumível e Outro.
+- Ataque físico básico de uma arma não consome VP.
+- Perfis: Leve 1d6/1 PA/1 mão; Padrão 1d8/1 PA/1 ou 2 mãos; Pesada 1d10/1 PA/2 mãos; Muito pesada 1d12/2 PA/2 mãos.
+- O Grau não concede bônus automático para acertar.
+- VP de efeitos sobrenaturais: Grau 4=2, Grau 3=4, Grau 2=6, Grau 1=9, Grau Especial=12 base.
+- Item amaldiçoado criado por jogador fica pendente e precisa ser aprovado pelo Mestre.
+- Slots: mão principal, mão secundária, corpo, acessório 1 e acessório 2.
+- Apenas itens aprovados e equipados liberam ataques e efeitos ativos no combate.
+- Uma arma amaldiçoada não torna o ataque elegível a Kokusen automaticamente. O usuário pode conduzir +1 EA no ataque básico da arma para torná-lo elegível em 20 natural.
+- Efeitos do item podem ser Passivo, Ativo, Reação ou Ataque especial, com VP, PA, EA, dano, condição e cargas.
+- O Mestre pode criar exceções narrativas de VP com override explícito.
