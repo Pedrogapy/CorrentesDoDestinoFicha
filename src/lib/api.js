@@ -335,6 +335,19 @@ export async function createEncounter(name) {
   return data;
 }
 
+// Encerra o combate sem apagar participantes, rolagens ou histórico.
+// A política RLS de combat_encounters permite esta alteração apenas ao Mestre.
+export async function endEncounter(encounterId) {
+  const { data, error } = await supabase
+    .from('combat_encounters')
+    .update({ status: 'ended', ended_at: new Date().toISOString() })
+    .eq('id', encounterId)
+    .select('*')
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 export async function addCombatParticipant(encounterId, character) {
   const { data, error } = await supabase
     .from('combat_participants')

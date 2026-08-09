@@ -70,7 +70,9 @@ function actionCard(action, ctx) {
       : `<br>Defesa ${esc(action.defense_type)}: ${action.defense_total??'—'}${action.defense_natural!=null?` (natural ${action.defense_natural})`:''}`
     : '';
   const tags=[action.is_critical?'<span class="pill warn">Crítico</span>':'',action.is_kokusen?'<span class="pill bad">Kokusen</span>':'',action.kokusen_denied?'<span class="pill">Kokusen anulado</span>':''].filter(Boolean).join(' ');
-  const pending = incoming && action.status==='pending_defense';
+  // O Mestre pode resolver qualquer reação pendente (útil para NPCs e para destravar testes).
+  // Jogadores só podem reagir quando são o alvo da ação.
+  const pending = action.status==='pending_defense' && (state.profile.role==='master' || incoming);
   const counter = action.counterattack_available && (state.profile.role==='master' || action.target_character_id===state.character?.id);
   return `<div class="list-item combat-action ${pending?'incoming':''}">
     <div class="btn-row"><div class="title">${esc(action.attacker_name)} → ${esc(action.target_name)} • ${esc(action.label)}</div><span class="pill">${esc(action.status)}</span>${tags}</div>
@@ -211,10 +213,19 @@ export async function renderMasterCombatPageV2(ctx) {
   const approvedAbilities=abilities.filter(a=>a.status==='approved'); const attackEquipment=equipment.filter(i=>equipmentDefaults(i).enabled);
   const targetOpts=actor?targetOptions(targets,actor.id):'';
   root.innerHTML=`${pageHeader(`Rodada ${active.round}`,'Combate do Mestre','<span class="pill bad">Rolagens do Mestre ficam ocultas para jogadores</span>')}
+    <section class="card combat-master-controls"><div class="btn-row"><div><strong>${esc(active.name)}</strong><div class="muted small">Combate ativo. Você pode encerrá-lo mesmo com uma reação pendente.</div></div><button class="btn bad" id="end-encounter">Encerrar combate</button></div></section>
+    <div style="height:14px"></div>
     <section class="grid grid-2"><div class="card"><h2>Participantes</h2><div class="list">${participants.map(p=>participantCard(p,ctx,true)).join('')||'<p class="muted">Vazio.</p>'}</div><h3>Adicionar</h3><div class="btn-row">${state.masterCharacters.filter(c=>!inCombat.has(c.id)).map(c=>`<button class="btn" data-add-combat="${c.id}">${esc(getName(c))}</button>`).join('')}</div></div>
     <div class="card"><h2>Ações do Mestre</h2>${actor?`<label>Entidade ativa<select id="master-actor">${participants.map(p=>`<option value="${p.character_id}" ${p.character_id===actor.id?'selected':''}>${esc(getName(p.characters))}</option>`).join('')}</select></label><form id="master-basic" class="grid" style="margin-top:10px"><h3>Golpe corpo a corpo</h3><label>Alvo<select name="target">${targetOpts}</select></label><label style="display:flex;align-items:center;gap:7px"><input name="cursed" type="checkbox" style="width:auto" /> Reforçar com 1 EA</label><button class="btn bad">Atacar em segredo</button></form><hr style="border-color:#333"><form id="master-skill" class="grid"><h3>Teste secreto</h3><label>Perícia<select name="skill">${optionList(SKILLS)}</select></label>${modeFields('')}<button class="btn bad">Rolar em segredo</button></form>`:'<p class="muted">Adicione participantes.</p>'}</div></section>
     ${actor?`<div style="height:14px"></div><section class="grid grid-2"><div class="card"><h2>Habilidades de ${esc(getName(actor))}</h2><div class="list">${approvedAbilities.map(a=>{const c=sourceDefaults(a);return `<div class="list-item"><div class="title">${esc(a.name)}</div><div class="meta">${c.paCost} PA • ${c.eaCost} EA</div><label>Alvo<select data-master-ability-target="${a.id}">${targetOpts}<option value="${actor.id}">${esc(getName(actor))}</option></select></label><button class="btn bad" data-master-use-ability="${a.id}" style="margin-top:8px">Usar</button></div>`}).join('')||'<p class="muted">Nenhuma habilidade aprovada.</p>'}</div></div><div class="card"><h2>Equipamentos ofensivos</h2><div class="list">${attackEquipment.map(i=>`<div class="list-item"><div class="title">${esc(i.name)}</div><label>Alvo<select data-master-equipment-target="${i.id}">${targetOpts}</select></label><button class="btn bad" data-master-use-equipment="${i.id}" style="margin-top:8px">Atacar</button></div>`).join('')||'<p class="muted">Nenhum equipamento ofensivo.</p>'}</div></div></section>`:''}
     <div style="height:14px"></div><section class="card"><h2>Ações e reações</h2><div class="list">${actions.map(a=>actionCard(a,ctx)).join('')||'<p class="muted">Nenhuma ação.</p>'}</div></section>`;
+  root.querySelector('#end-encounter')?.addEventListener('click',async()=>{
+    if(!confirm('Encerrar este combate? As fichas permanecem salvas e o histórico não será apagado.')) return;
+    await withBusy(()=>api.endEncounter(active.id),'Combate encerrado.');
+    state.activeEncounter=null;
+    state.combatActorId=null;
+    renderMasterCombatPageV2(ctx);
+  });
   root.querySelectorAll('[data-add-combat]').forEach(btn=>btn.onclick=async()=>{const c=state.masterCharacters.find(x=>x.id===btn.dataset.addCombat);await withBusy(()=>api.addCombatParticipant(active.id,c),'Participante adicionado.');renderMasterCombatPageV2(ctx);});
   root.querySelectorAll('[data-save-combat]').forEach(btn=>btn.onclick=async()=>{const id=btn.dataset.saveCombat;await withBusy(()=>api.updateCombatParticipant(id,{current_ps:Number(root.querySelector(`[data-cps="${id}"]`).value),current_ea:Number(root.querySelector(`[data-cea="${id}"]`).value),current_pa:Number(root.querySelector(`[data-cpa="${id}"]`).value)}),'Recursos atualizados.');renderMasterCombatPageV2(ctx);});
   root.querySelector('#master-actor')?.addEventListener('change',e=>{state.combatActorId=e.target.value;renderMasterCombatPageV2(ctx);});
