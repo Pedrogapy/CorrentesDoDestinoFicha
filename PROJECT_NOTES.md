@@ -85,18 +85,25 @@ Expansões de domínio são desenvolvimento narrativo/técnico e não são dadas
 
 Depois do site funcionar, criar **Souta Minazuki** pelo próprio painel do mestre como primeiro teste completo do criador de NPCs. Não inserir a ficha dele manualmente no banco só para contornar problemas: qualquer incômodo encontrado deve ser corrigido no criador/sistema.
 
-## Equipamentos e Ferramentas Amaldiçoadas - v0.5
+## Equipamentos e Ferramentas Amaldiçoadas - v0.6
 
 Regras canônicas implementadas no site:
 
 - Categorias: Arma, Amuleto/Acessório, Roupa/Armadura, Consumível e Outro.
 - Ataque físico básico de uma arma não consome VP.
-- Perfis: Leve 1d6/1 PA/1 mão; Padrão 1d8/1 PA/1 ou 2 mãos; Pesada 1d10/1 PA/2 mãos; Muito pesada 1d12/2 PA/2 mãos.
-- O Grau não concede bônus automático para acertar.
+- Perfis: Leve 1d6/1 PA/1 mão; Padrão 1d8/1 PA e pode usar duas mãos no ataque para 1d10 se a mão secundária estiver livre; Pesada 1d12/1 PA/2 mãos; Muito pesada 2d10/2 PA/2 mãos.
+- Mão principal e Mão secundária são slots físicos, sem bônus ou penalidade de acerto.
+- Armas Pesadas/Muito Pesadas são equipadas na Mão principal e ocupam as duas mãos.
+- Slots corporais: Cabeça, Pescoço, Corpo, Braços/Pulsos, Cintura, Pés, Acessório 1 e Acessório 2.
+- Amuletos/acessórios podem funcionar vestidos; quando o item permite ser segurado, também podem ocupar Mão principal ou Mão secundária.
+- Cada item amaldiçoado aprovado e equipado consome 1 Sintonia, inclusive armas. Consumíveis e itens comuns não consomem.
+- Capacidade de Sintonia: 3 (Nv 1-24), 4 (25-49), 5 (50-74), 6 (75-99), 7 (100).
 - VP de efeitos sobrenaturais: Grau 4=2, Grau 3=4, Grau 2=6, Grau 1=9, Grau Especial=12 base.
+- O Grau não concede bônus automático para acertar.
 - Item amaldiçoado criado por jogador fica pendente e precisa ser aprovado pelo Mestre.
-- Slots: mão principal, mão secundária, corpo, acessório 1 e acessório 2.
-- Apenas itens aprovados e equipados liberam ataques e efeitos ativos no combate.
+- Apenas itens aprovados e equipados liberam ataques/passivos. Consumíveis aprovados podem usar efeitos ativos diretamente do inventário.
 - Uma arma amaldiçoada não torna o ataque elegível a Kokusen automaticamente. O usuário pode conduzir +1 EA no ataque básico da arma para torná-lo elegível em 20 natural.
 - Efeitos do item podem ser Passivo, Ativo, Reação ou Ataque especial, com VP, PA, EA, dano, condição e cargas.
+- Passivos usam a duração própria "Enquanto equipado".
+- Equipamentos podem ser excluídos pelo dono da ficha ou pelo Mestre, com confirmação na interface.
 - O Mestre pode criar exceções narrativas de VP com override explícito.

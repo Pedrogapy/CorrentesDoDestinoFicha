@@ -9,7 +9,7 @@
  * - Não expor sistemas narrativamente secretos em telas de jogador apenas por estarem implementados no banco.
  */
 
-export const SYSTEM_VERSION = '0.5.0';
+export const SYSTEM_VERSION = '0.6.0';
 
 export const ATTRIBUTES = [
   {
@@ -148,17 +148,62 @@ export const EQUIPMENT_CATEGORIES = [
   { key: 'other', name: 'Outro' },
 ];
 
+/**
+ * Slots físicos. Mão principal e secundária são apenas posições ocupadas:
+ * nenhuma delas dá bônus ou penalidade de acerto.
+ */
 export const EQUIPMENT_SLOTS = [
-  { key: 'main_hand', name: 'Mão principal', categories: ['weapon'] },
-  { key: 'off_hand', name: 'Mão secundária', categories: ['weapon'] },
-  { key: 'body', name: 'Corpo', categories: ['armor'] },
-  { key: 'accessory_1', name: 'Acessório 1', categories: ['accessory'] },
-  { key: 'accessory_2', name: 'Acessório 2', categories: ['accessory'] },
+  { key: 'main_hand', name: 'Mão principal' },
+  { key: 'off_hand', name: 'Mão secundária' },
+  { key: 'head', name: 'Cabeça' },
+  { key: 'neck', name: 'Pescoço' },
+  { key: 'body', name: 'Corpo' },
+  { key: 'arms', name: 'Braços / pulsos' },
+  { key: 'waist', name: 'Cintura' },
+  { key: 'feet', name: 'Pés' },
+  { key: 'accessory_1', name: 'Acessório 1' },
+  { key: 'accessory_2', name: 'Acessório 2' },
 ];
 
 /**
+ * Local corporal preferencial de itens não-arma.
+ * "Acessório genérico" ocupa um dos dois slots de acessório.
+ */
+export const EQUIPMENT_WEAR_LOCATIONS = [
+  { key: 'none', name: 'Não vestível' },
+  { key: 'head', name: 'Cabeça' },
+  { key: 'neck', name: 'Pescoço' },
+  { key: 'body', name: 'Corpo' },
+  { key: 'arms', name: 'Braços / pulsos' },
+  { key: 'waist', name: 'Cintura' },
+  { key: 'feet', name: 'Pés' },
+  { key: 'accessory', name: 'Acessório genérico' },
+];
+
+/**
+ * Sintonia limita quantos itens amaldiçoados podem ficar ATIVOS ao mesmo tempo.
+ * O limite acompanha os mesmos grandes marcos de PA para ser fácil de lembrar.
+ * Itens comuns não gastam Sintonia. Consumíveis não ficam sintonizados.
+ */
+export function equipmentAttunementCapacity(level) {
+  const lv = Math.max(1, Math.min(100, Number(level) || 1));
+  if (lv >= 100) return 7;
+  if (lv >= 75) return 6;
+  if (lv >= 50) return 5;
+  if (lv >= 25) return 4;
+  return 3;
+}
+
+export function equipmentAttunementUsed(items = []) {
+  return (Array.isArray(items) ? items : []).filter((item) =>
+    item?.equipped && item?.status === 'approved' && item?.is_cursed && item?.category !== 'consumable'
+  ).length;
+}
+
+/**
  * O dano básico de uma arma é parte do perfil físico da arma e NÃO consome VP.
- * Poderes sobrenaturais ficam em effects[] e usam o orçamento do grau.
+ * A arma Padrão é versátil: 1d8 com uma mão ou 1d10 no ataque quando usada
+ * com duas mãos e a mão secundária estiver livre.
  */
 export const WEAPON_PROFILES = {
   light: {
@@ -174,30 +219,50 @@ export const WEAPON_PROFILES = {
     name: 'Padrão',
     damageDiceCount: 1,
     damageDie: 8,
+    twoHandedDamageDiceCount: 1,
+    twoHandedDamageDie: 10,
     paCost: 1,
     handsMin: 1,
     handsMax: 2,
-    description: '1d8 + modificador. 1 PA. Uma ou duas mãos.',
+    description: '1d8 + modificador com uma mão; 1d10 + modificador quando empunhada com duas mãos. 1 PA.',
   },
   heavy: {
     name: 'Pesada',
     damageDiceCount: 1,
-    damageDie: 10,
+    damageDie: 12,
     paCost: 1,
     handsMin: 2,
     handsMax: 2,
-    description: '1d10 + modificador. 1 PA. Exige duas mãos.',
+    description: '1d12 + modificador. 1 PA. Exige duas mãos.',
   },
   very_heavy: {
     name: 'Muito pesada',
-    damageDiceCount: 1,
-    damageDie: 12,
+    damageDiceCount: 2,
+    damageDie: 10,
     paCost: 2,
     handsMin: 2,
     handsMax: 2,
-    description: '1d12 + modificador. 2 PA. Exige duas mãos.',
+    description: '2d10 + modificador. 2 PA. Exige duas mãos. É uma opção de impacto concentrado, não de eficiência por PA.',
   },
 };
+
+export function weaponDamageProfile(profile = 'standard', twoHanded = false) {
+  const p = WEAPON_PROFILES[profile] || WEAPON_PROFILES.standard;
+  if (profile === 'standard' && twoHanded) {
+    return {
+      damageDiceCount: p.twoHandedDamageDiceCount,
+      damageDie: p.twoHandedDamageDie,
+      paCost: p.paCost,
+      handsUsed: 2,
+    };
+  }
+  return {
+    damageDiceCount: p.damageDiceCount,
+    damageDie: p.damageDie,
+    paCost: p.paCost,
+    handsUsed: p.handsMin,
+  };
+}
 
 export const EQUIPMENT_GRADE_VP = {
   'Sem Grau': 0,
@@ -225,6 +290,10 @@ export function equipmentSlotName(key) {
   return EQUIPMENT_SLOTS.find((item) => item.key === key)?.name || key || 'Não equipado';
 }
 
+export function equipmentWearLocationName(key) {
+  return EQUIPMENT_WEAR_LOCATIONS.find((item) => item.key === key)?.name || key || 'Não vestível';
+}
+
 export function weaponAttackConfig({
   profile = 'standard',
   attackAttributeKey = 'strength',
@@ -232,15 +301,15 @@ export function weaponAttackConfig({
   damageAttributeKey = attackAttributeKey,
   range = 'melee',
 } = {}) {
-  const p = WEAPON_PROFILES[profile] || WEAPON_PROFILES.standard;
+  const damage = weaponDamageProfile(profile, false);
   return {
     enabled: true,
     attack_attribute_key: attackAttributeKey,
     attack_skill_key: attackSkillKey,
-    pa_cost: p.paCost,
+    pa_cost: damage.paCost,
     ea_cost: 0,
-    damage_die: p.damageDie,
-    damage_dice_count: p.damageDiceCount,
+    damage_die: damage.damageDie,
+    damage_dice_count: damage.damageDiceCount,
     damage_flat_attribute_key: damageAttributeKey || null,
     uses_cursed_energy: false,
     critical_threshold: 20,

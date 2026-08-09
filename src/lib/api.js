@@ -223,7 +223,7 @@ export async function updateEquipment(id, changes) {
 }
 
 export async function deleteEquipment(id) {
-  const { error } = await supabase.from('equipment').delete().eq('id', id);
+  const { error } = await supabase.rpc('delete_equipment', { p_item_id: id });
   if (error) throw error;
 }
 

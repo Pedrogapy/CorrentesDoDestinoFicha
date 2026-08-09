@@ -501,12 +501,15 @@ function renderSystemPage() {
     <div style="height:14px"></div>
     <section class="card"><h2>Equipamentos e Ferramentas Amaldiçoadas</h2>
       <p><strong>Golpe corpo a corpo:</strong> continua disponível mesmo sem arma e causa 1d6 + Mod. Força por 1 PA.</p>
-      <p><strong>Perfis de arma:</strong> Leve 1d6/1 PA; Padrão 1d8/1 PA; Pesada 1d10/1 PA e duas mãos; Muito pesada 1d12/2 PA e duas mãos.</p>
+      <p><strong>Perfis de arma:</strong> Leve 1d6/1 PA/1 mão; Padrão 1d8/1 PA/1 mão, podendo usar duas mãos no ataque para 1d10 quando a mão secundária estiver livre; Pesada 1d12/1 PA/2 mãos; Muito pesada 2d10/2 PA/2 mãos.</p>
+      <p><strong>Mãos:</strong> Mão principal e Mão secundária são slots físicos. Nenhuma concede bônus ou penalidade de acerto. Armas de duas mãos são ancoradas na Mão principal e ocupam as duas mãos.</p>
+      <p><strong>Corpo:</strong> itens podem ocupar Cabeça, Pescoço, Corpo, Braços/Pulsos, Cintura, Pés ou um dos dois slots genéricos de Acessório. Um amuleto não precisa ocupar uma mão se puder ser vestido.</p>
+      <p><strong>Segurar acessórios:</strong> quando a ficha do item permitir, um amuleto ou outro objeto pode ser ativado na Mão principal ou Mão secundária em vez de seu slot corporal. Isso ocupa fisicamente a mão.</p>
+      <p><strong>Sintonia:</strong> cada item amaldiçoado aprovado e equipado consome 1 Sintonia, inclusive armas. Capacidade: 3 (Nv 1–24), 4 (25–49), 5 (50–74), 6 (75–99), 7 (100). Itens comuns e consumíveis não gastam Sintonia.</p>
       <p><strong>VP:</strong> o ataque físico básico da arma não consome VP. Somente efeitos sobrenaturais usam o orçamento: Grau 4 = 2 VP, Grau 3 = 4 VP, Grau 2 = 6 VP, Grau 1 = 9 VP, Grau Especial = 12 VP base.</p>
       <p><strong>Acerto:</strong> o Grau da ferramenta não fornece bônus automático. O ataque continua usando Atributo + Perícia.</p>
       <p><strong>Kokusen:</strong> uma arma amaldiçoada não torna o golpe elegível sozinha. É necessário conduzir Energia Amaldiçoada no ataque.</p>
-      <p><strong>Equipar:</strong> há mão principal, mão secundária, corpo e dois slots de acessório. O item precisa estar aprovado e equipado para liberar ataques e efeitos ativos em combate.</p>
-      <p class="muted">Ferramentas amaldiçoadas propostas por jogadores ficam pendentes até aprovação do Mestre.</p>
+      <p class="muted">Ferramentas amaldiçoadas propostas por jogadores ficam pendentes até aprovação do Mestre. Itens precisam estar equipados para seus passivos permanecerem ativos; consumíveis aprovados podem ser usados diretamente do inventário.</p>
     </section>
     <div style="height:14px"></div>
     <section class="card"><h2>Condições</h2><div class="list">${state.conditions.length?state.conditions.map(c=>`<div class="list-item"><div class="title">${esc(c.name)}</div><div class="body">${esc(c.description)}</div></div>`).join(''):'<p class="muted">Nenhuma condição cadastrada.</p>'}</div></section>

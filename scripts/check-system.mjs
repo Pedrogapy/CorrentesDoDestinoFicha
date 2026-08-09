@@ -10,6 +10,8 @@ import {
   equipmentEffectsVp,
   WEAPON_PROFILES,
   weaponAttackConfig,
+  weaponDamageProfile,
+  equipmentAttunementCapacity,
 } from '../src/lib/system.js';
 
 for (const level of [1,5,25,50,75,100]) {
@@ -39,11 +41,22 @@ for (const [grade,expected] of Object.entries(expectedEquipmentVp)) {
   if (equipmentVpBudget(grade,true)!==expected) throw new Error(`VP de equipamento incorreto para ${grade}`);
 }
 if (equipmentEffectsVp([{vp:1},{vp:3}])!==4) throw new Error('Soma de VP de efeitos incorreta');
-const profileChecks={ light:[6,1], standard:[8,1], heavy:[10,1], very_heavy:[12,2] };
-for (const [profile,[die,pa]] of Object.entries(profileChecks)) {
+const profileChecks={
+  light:[1,6,1],
+  standard:[1,8,1],
+  heavy:[1,12,1],
+  very_heavy:[2,10,2],
+};
+for (const [profile,[count,die,pa]] of Object.entries(profileChecks)) {
   const c=weaponAttackConfig({profile});
-  if (c.damage_die!==die || c.pa_cost!==pa || c.damage_dice_count!==1) throw new Error(`Perfil de arma incorreto: ${profile}`);
+  if (c.damage_die!==die || c.pa_cost!==pa || c.damage_dice_count!==count) throw new Error(`Perfil de arma incorreto: ${profile}`);
   if (!WEAPON_PROFILES[profile]) throw new Error(`Perfil ausente: ${profile}`);
 }
+const standardTwo=weaponDamageProfile('standard',true);
+if (standardTwo.damageDiceCount!==1 || standardTwo.damageDie!==10 || standardTwo.paCost!==1 || standardTwo.handsUsed!==2) throw new Error('Empunhadura de duas mãos da arma Padrão incorreta');
+const attunementExpected={1:3,5:3,24:3,25:4,50:5,75:6,99:6,100:7};
+for (const [level,expected] of Object.entries(attunementExpected)) {
+  if (equipmentAttunementCapacity(Number(level))!==expected) throw new Error(`Sintonia incorreta no nível ${level}`);
+}
 
-console.log('OK: fórmulas básicas, equipamentos e distribuições neutras válidas.');
+console.log('OK: fórmulas básicas, dano de armas, Sintonia, equipamentos e distribuições neutras válidas.');
