@@ -1,0 +1,4 @@
+project_id = "correntes-do-destino"
+
+[functions.session-backup]
+verify_jwt = true

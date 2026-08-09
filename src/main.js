@@ -1,0 +1,765 @@
+import './styles.css';
+import { isConfigured, supabase } from './lib/supabase.js';
+import { signInCharacter, signUpCharacter, signOut } from './lib/auth.js';
+import * as api from './lib/api.js';
+import {
+  ATTRIBUTES,
+  SKILLS,
+  ATTRIBUTE_BY_KEY,
+  ABILITY_CATEGORIES,
+  ENTITY_TYPES,
+  GRADE_OPTIONS,
+  attributeModifier,
+  attributePointBudget,
+  attributeCap,
+  skillPointBudget,
+  skillCap,
+  growthPointBudget,
+  actionPoints,
+  xpForNextLevel,
+  characterDerived,
+  validateBuild,
+  slotBudget,
+  VP_OPTIONS,
+  estimateAbilityVP,
+  SYSTEM_VERSION,
+} from './lib/system.js';
+import { rollD20 } from './lib/dice.js';
+
+const app = document.querySelector('#app');
+
+const state = {
+  authSession: null,
+  profile: null,
+  character: null,
+  editingCharacter: null,
+  conditions: [],
+  activeSession: null,
+  tab: 'sheet',
+  authMode: 'login',
+  masterCharacters: [],
+  masterSelectedCharacter: null,
+  activeEncounter: null,
+  encounterParticipants: [],
+  summonSelected: null,
+  realtimeChannel: null,
+  loading: false,
+};
+
+const playerTabs = [
+  ['sheet', 'Ficha'],
+  ['system', 'Sistema'],
+  ['abilities', 'Habilidades'],
+  ['training', 'Treino'],
+  ['vows', 'Votos'],
+  ['equipment', 'Inventário'],
+  ['combat', 'Combate'],
+  ['history', 'Histórico'],
+];
+
+const masterTabs = [
+  ['master', 'Mestre'],
+  ['system', 'Sistema'],
+  ['combat', 'Combate'],
+  ['history', 'Histórico'],
+];
+
+function esc(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
+function toast(message, type = '') {
+  let wrap = document.querySelector('.toast-wrap');
+  if (!wrap) {
+    wrap = document.createElement('div');
+    wrap.className = 'toast-wrap';
+    document.body.appendChild(wrap);
+  }
+  const node = document.createElement('div');
+  node.className = `toast ${type}`;
+  node.textContent = message;
+  wrap.appendChild(node);
+  setTimeout(() => node.remove(), 4200);
+}
+
+function showInfoModal(title, body) {
+  const overlay = document.createElement('div');
+  overlay.className = 'overlay';
+  overlay.innerHTML = `<div class="modal"><div class="btn-row" style="justify-content:space-between"><h2>${esc(title)}</h2><button class="btn" data-close-modal>Fechar</button></div><p>${esc(body)}</p></div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('[data-close-modal]').onclick = () => overlay.remove();
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+}
+
+function bindConditionLinks(root = document) {
+  root.querySelectorAll('[data-condition-key]').forEach((button) => {
+    button.onclick = () => {
+      const condition = state.conditions.find(c => c.key === button.dataset.conditionKey);
+      if (condition) showInfoModal(condition.name, condition.description);
+    };
+  });
+}
+
+function formatDate(value) {
+  if (!value) return '—';
+  return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
+}
+
+function downloadJson(filename, data) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function getName(character) {
+  return [character?.first_name, character?.last_name].filter(Boolean).join(' ').trim() || 'Sem nome';
+}
+
+async function withBusy(task, successMessage = '') {
+  if (state.loading) return;
+  state.loading = true;
+  try {
+    const result = await task();
+    if (successMessage) toast(successMessage, 'good');
+    return result;
+  } catch (error) {
+    console.error(error);
+    toast(error?.message || String(error), 'bad');
+    throw error;
+  } finally {
+    state.loading = false;
+  }
+}
+
+function setupScreen() {
+  app.innerHTML = `
+    <div class="auth-shell">
+      <section class="auth-card">
+        <div class="eyebrow">Configuração necessária</div>
+        <h1>Correntes<br>do Destino</h1>
+        <p>O projeto está pronto, mas o arquivo <strong>.env</strong> ainda não contém as chaves públicas do Supabase.</p>
+        <div class="notice">
+          Copie <code>.env.example</code> para <code>.env</code>, preencha <code>VITE_SUPABASE_URL</code> e <code>VITE_SUPABASE_PUBLISHABLE_KEY</code>, e execute novamente <code>npm run dev</code>.
+        </div>
+      </section>
+    </div>`;
+}
+
+function authScreen() {
+  const register = state.authMode === 'register';
+  app.innerHTML = `
+    <div class="auth-shell">
+      <section class="auth-card">
+        <div class="eyebrow">Ficha digital • Sistema ${esc(SYSTEM_VERSION)}</div>
+        <h1>Correntes<br>do Destino</h1>
+        <p>${register ? 'Crie o acesso do personagem. Cada conta de jogador possui uma ficha principal.' : 'Entre usando o nome completo do personagem e o sobrenome definido como senha.'}</p>
+        <form id="auth-form">
+          <label>Nome completo do personagem
+            <input name="name" autocomplete="username" placeholder="Jin Okkotsu" required />
+          </label>
+          <label>${register ? 'Sobrenome usado como senha' : 'Senha'}
+            <input name="password" type="password" autocomplete="current-password" placeholder="Sobrenome" required />
+          </label>
+          <button class="btn primary" type="submit">${register ? 'Criar acesso' : 'Entrar'}</button>
+        </form>
+        <div class="switcher">
+          <button class="btn ghost" id="switch-auth">${register ? 'Já tenho acesso' : 'Primeiro acesso'}</button>
+        </div>
+        <p class="small muted">A conta usa autenticação do Supabase. As regras de acesso aos dados são aplicadas também no banco, não apenas na interface.</p>
+      </section>
+    </div>`;
+
+  document.querySelector('#switch-auth').onclick = () => {
+    state.authMode = register ? 'login' : 'register';
+    authScreen();
+  };
+
+  document.querySelector('#auth-form').onsubmit = async (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const name = String(form.get('name') || '').trim();
+    const password = String(form.get('password') || '').trim();
+    try {
+      if (register) {
+        const { data, error } = await signUpCharacter(name, password);
+        if (error) throw error;
+        if (!data.session) {
+          toast('Conta criada. Se a confirmação de e-mail estiver ligada no Supabase, desative-a para este projeto e tente entrar.', 'warn');
+          state.authMode = 'login';
+          authScreen();
+          return;
+        }
+      } else {
+        const { error } = await signInCharacter(name, password);
+        if (error) throw error;
+      }
+      await loadApp();
+    } catch (error) {
+      toast(error.message, 'bad');
+    }
+  };
+}
+
+async function loadApp() {
+  const { data } = await supabase.auth.getSession();
+  state.authSession = data.session;
+  if (!state.authSession) return authScreen();
+
+  await withBusy(async () => {
+    state.profile = await api.getProfile();
+    state.conditions = await api.getSystemConditions();
+    state.activeSession = await api.getActiveSession();
+
+    if (state.profile.role === 'master') {
+      state.masterCharacters = await api.listAllCharacters();
+      state.character = null;
+      if (state.tab !== 'system' && state.tab !== 'combat' && state.tab !== 'history') state.tab = 'master';
+    } else {
+      state.character = await api.ensureMyCharacter(state.authSession.user);
+      state.editingCharacter = structuredClone(state.character);
+      if (state.tab === 'master') state.tab = 'sheet';
+    }
+  });
+
+  renderShell();
+}
+
+function renderShell() {
+  const isMaster = state.profile?.role === 'master';
+  const tabs = isMaster ? masterTabs : playerTabs;
+  const title = isMaster ? 'Painel do Mestre' : getName(state.character);
+
+  app.innerHTML = `
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark">呪</div>
+          <div>
+            <div class="brand-title">Correntes do Destino</div>
+            <div class="brand-sub">${esc(title)}</div>
+          </div>
+        </div>
+        <div class="top-actions">
+          ${state.activeSession ? '<span class="pill bad hide-mobile">Sessão ativa</span>' : '<span class="pill good hide-mobile">Interlúdio</span>'}
+          <button class="btn ghost" id="logout-btn">Sair</button>
+        </div>
+      </header>
+      <div class="layout">
+        <aside class="sidebar">${tabs.map(([key,name]) => `<button class="nav-btn ${state.tab===key?'active':''}" data-tab="${key}">${name}</button>`).join('')}</aside>
+        <main class="content" id="page"></main>
+      </div>
+      <nav class="bottom-nav">${tabs.map(([key,name]) => `<button class="nav-btn ${state.tab===key?'active':''}" data-tab="${key}">${name}</button>`).join('')}</nav>
+    </div>`;
+
+  document.querySelectorAll('[data-tab]').forEach((button) => {
+    button.onclick = () => {
+      state.tab = button.dataset.tab;
+      renderShell();
+    };
+  });
+  document.querySelector('#logout-btn').onclick = async () => {
+    await signOut();
+    Object.assign(state, { authSession: null, profile: null, character: null, editingCharacter: null, tab: 'sheet' });
+    authScreen();
+  };
+
+  renderCurrentPage();
+}
+
+function renderCurrentPage() {
+  switch (state.tab) {
+    case 'sheet': return renderSheetPage();
+    case 'system': return renderSystemPage();
+    case 'abilities': return renderAbilitiesPage();
+    case 'training': return renderTrainingPage();
+    case 'vows': return renderVowsPage();
+    case 'equipment': return renderEquipmentPage();
+    case 'combat': return state.profile.role === 'master' ? renderMasterCombatPage() : renderPlayerCombatPage();
+    case 'history': return renderHistoryPage();
+    case 'master': return renderMasterPage();
+    default: return renderSystemPage();
+  }
+}
+
+function pageHeader(kicker, title, extra = '') {
+  return `<div class="page-title"><div><div class="kicker">${esc(kicker)}</div><h1>${esc(title)}</h1></div>${extra}</div>`;
+}
+
+function characterStatsHtml(character) {
+  const d = characterDerived(character);
+  return `
+    <div class="grid grid-4">
+      <div class="card stat"><span class="label">PS Máximo</span><span class="value">${d.ps}</span></div>
+      <div class="card stat"><span class="label">EA Máxima</span><span class="value">${d.ea}</span></div>
+      <div class="card stat"><span class="label">CA</span><span class="value">${d.ca}</span><span class="small muted">Ref ${d.reflex} • Def ${d.defend} • For ${d.fortitude} • Ref. EA ${d.reinforcement}</span></div>
+      <div class="card stat"><span class="label">PA / rodada</span><span class="value">${d.pa}</span></div>
+    </div>`;
+}
+
+function renderSheetPage() {
+  if (!state.character) return;
+  state.editingCharacter ||= structuredClone(state.character);
+  renderCharacterEditor(state.editingCharacter, false, document.querySelector('#page'));
+}
+
+function renderCharacterEditor(character, isMasterEditor, root) {
+  const validation = validateBuild(character);
+  const respecLocked = !isMasterEditor && Boolean(state.activeSession);
+  const attrUsed = ATTRIBUTES.reduce((sum,a)=>sum+Number(character.attributes?.[a.key]||0),0);
+  const skillUsed = SKILLS.reduce((sum,s)=>sum+Number(character.skills?.[s.key]||0),0);
+  const growthUsed = Number(character.growth_vigor||0)+Number(character.growth_reserve||0);
+  const xpCost = xpForNextLevel(character.level);
+  const canLevel = !isMasterEditor && character.entity_type==='player' && !state.activeSession && xpCost && character.xp >= xpCost;
+  const image = character.image_url
+    ? `<img class="avatar" src="${esc(character.image_url)}" alt="${esc(getName(character))}" />`
+    : `<div class="avatar-placeholder">?</div>`;
+
+  root.innerHTML = `
+    ${pageHeader(isMasterEditor ? 'Editor administrativo' : `Nível ${character.level} • ${character.grade}`, getName(character), `<span class="pill ${validation.valid?'good':'bad'}">${validation.valid?'Build válida':'Revisar build'}</span>`)}
+    <section class="card paper character-hero">
+      ${image}
+      <div>
+        <div class="field-row">
+          <label>Nome<input id="char-first" value="${esc(character.first_name)}" /></label>
+          <label>Sobrenome<input id="char-last" value="${esc(character.last_name)}" /></label>
+        </div>
+        <div class="field-row" style="margin-top:8px">
+          <label>Apelido<input id="char-nick" value="${esc(character.nickname||'')}" /></label>
+          <label>Grau
+            <select id="char-grade" ${isMasterEditor?'':'disabled'}>${GRADE_OPTIONS.map(g=>`<option ${g===character.grade?'selected':''}>${g}</option>`).join('')}</select>
+          </label>
+        </div>
+        ${isMasterEditor ? `<div class="field-row-3" style="margin-top:8px">
+          <label>Nível<input id="char-level" type="number" min="1" max="100" value="${character.level}" /></label>
+          <label>XP<input id="char-xp" type="number" min="0" value="${character.xp}" /></label>
+          <label>Tipo<select id="char-type">${ENTITY_TYPES.map(t=>`<option value="${t.key}" ${t.key===character.entity_type?'selected':''}>${t.name}</option>`).join('')}</select></label>
+        </div>` : character.entity_type==='player' ? `<div class="btn-row" style="margin-top:10px"><span class="pill">XP ${character.xp}${xpCost ? ` / ${xpCost}` : ''}</span><button class="btn primary" id="level-up" ${canLevel?'':'disabled'}>Subir de nível</button></div>` : `<div class="btn-row" style="margin-top:10px"><span class="pill">Ficha filha • Nv ${character.level}</span></div>`}
+      </div>
+    </section>
+
+    <div style="height:14px"></div>
+    ${characterStatsHtml(character)}
+    ${respecLocked?'<div class="notice" style="margin-top:14px">Redistribuição de atributos, perícias e crescimento fica bloqueada enquanto uma sessão está ativa.</div>':''}
+
+    <div style="height:14px"></div>
+    <section class="grid grid-2">
+      <div class="card">
+        <div class="section-head"><h2>Atributos</h2><span class="budget ${attrUsed>attributePointBudget(character.level)?'over':''}">${attrUsed}/${attributePointBudget(character.level)} • máx. ${attributeCap(character.level)}</span></div>
+        <div class="attribute-grid">
+          ${ATTRIBUTES.map(attr => {
+            const value=Number(character.attributes?.[attr.key]||1);
+            return `<div class="attribute-card"><div class="name">${attr.name}</div><div class="mod">Modificador +${attributeModifier(value)}</div><div class="stepper"><button data-attr-minus="${attr.key}" ${respecLocked?'disabled':''}>−</button><div class="number">${value}</div><button data-attr-plus="${attr.key}" ${respecLocked?'disabled':''}>+</button></div></div>`;
+          }).join('')}
+        </div>
+      </div>
+      <div class="card">
+        <div class="section-head"><h2>Crescimento</h2><span class="budget ${growthUsed>growthPointBudget(character.level)?'over':''}">${growthUsed}/${growthPointBudget(character.level)}</span></div>
+        <p class="muted">Vigor aumenta PS. Reserva aumenta EA. Pontos redistribuíveis apenas fora de sessão.</p>
+        <div class="field-row">
+          <div class="attribute-card"><div class="name">Vigor</div><div class="stepper"><button data-growth="vigor" data-delta="-1" ${respecLocked?'disabled':''}>−</button><div class="number">${character.growth_vigor||0}</div><button data-growth="vigor" data-delta="1" ${respecLocked?'disabled':''}>+</button></div></div>
+          <div class="attribute-card"><div class="name">Reserva</div><div class="stepper"><button data-growth="reserve" data-delta="-1" ${respecLocked?'disabled':''}>−</button><div class="number">${character.growth_reserve||0}</div><button data-growth="reserve" data-delta="1" ${respecLocked?'disabled':''}>+</button></div></div>
+        </div>
+        ${isMasterEditor ? `<div class="field-row" style="margin-top:10px"><label>Bônus permanente de PS<input id="perm-ps" type="number" value="${character.permanent_ps_bonus||0}" /></label><label>Bônus permanente de EA<input id="perm-ea" type="number" value="${character.permanent_ea_bonus||0}" /></label></div>` : ''}
+      </div>
+    </section>
+
+    <div style="height:14px"></div>
+    <section class="card">
+      <div class="section-head"><h2>Perícias</h2><span class="budget ${skillUsed>skillPointBudget(character.level)?'over':''}">${skillUsed}/${skillPointBudget(character.level)} • máx. ${skillCap(character.level)}</span></div>
+      ${ATTRIBUTES.map(attr => `<div class="skills-group"><h3>${attr.name}</h3>${SKILLS.filter(s=>s.attribute===attr.key).map(skill=>{
+        const v=Number(character.skills?.[skill.key]||0);
+        return `<div class="skill-line"><div><div class="skill-name">${skill.name}</div><div class="skill-desc">${skill.description}</div></div><div class="stepper"><button data-skill-minus="${skill.key}" ${respecLocked?'disabled':''}>−</button><div class="number">${v}</div><button data-skill-plus="${skill.key}" ${respecLocked?'disabled':''}>+</button></div></div>`;
+      }).join('')}</div>`).join('')}
+    </section>
+
+    <div style="height:14px"></div>
+    <section class="grid grid-2">
+      <div class="card"><h2>Técnica Amaldiçoada</h2><label>Nome<input id="tech-name" value="${esc(character.technique_name||'')}" /></label><label style="margin-top:8px">Descrição<textarea id="tech-desc">${esc(character.technique_description||'')}</textarea></label></div>
+      <div class="card"><h2>Imagem</h2><label>URL da imagem<input id="image-url" value="${esc(character.image_url||'')}" placeholder="https://..." /></label><label style="margin-top:10px">Ou envie uma imagem<input id="image-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" /></label></div>
+    </section>
+
+    <div style="height:14px"></div>
+    <section class="grid grid-2">
+      <div class="card"><h2>Personagem</h2><label>História<textarea id="bio">${esc(character.biography||'')}</textarea></label><label>Personalidade<textarea id="personality">${esc(character.personality||'')}</textarea></label></div>
+      <div class="card"><h2>Detalhes</h2><label>Objetivos<textarea id="goals">${esc(character.goals||'')}</textarea></label><label>Aparência<textarea id="appearance">${esc(character.appearance||'')}</textarea></label><label>Notas<textarea id="notes">${esc(character.notes||'')}</textarea></label></div>
+    </section>
+
+    ${validation.valid ? '' : `<div class="notice bad" style="margin-top:14px">${validation.errors.map(esc).join('<br>')}</div>`}
+    <div class="btn-row" style="margin-top:16px"><button class="btn primary" id="save-character">Salvar ficha</button><button class="btn" id="export-character">Exportar JSON</button></div>
+  `;
+
+  const rerender = () => renderCharacterEditor(character, isMasterEditor, root);
+  root.querySelectorAll('[data-attr-minus]').forEach(btn=>btn.onclick=()=>{ const k=btn.dataset.attrMinus; character.attributes[k]=Math.max(1,Number(character.attributes[k]||1)-1); rerender(); });
+  root.querySelectorAll('[data-attr-plus]').forEach(btn=>btn.onclick=()=>{ const k=btn.dataset.attrPlus; const used=ATTRIBUTES.reduce((s,a)=>s+Number(character.attributes[a.key]||0),0); if(used<attributePointBudget(character.level) && character.attributes[k]<attributeCap(character.level)) character.attributes[k]++; rerender(); });
+  root.querySelectorAll('[data-skill-minus]').forEach(btn=>btn.onclick=()=>{ const k=btn.dataset.skillMinus; character.skills[k]=Math.max(0,Number(character.skills[k]||0)-1); rerender(); });
+  root.querySelectorAll('[data-skill-plus]').forEach(btn=>btn.onclick=()=>{ const k=btn.dataset.skillPlus; const used=SKILLS.reduce((s,a)=>s+Number(character.skills[a.key]||0),0); if(used<skillPointBudget(character.level) && Number(character.skills[k]||0)<skillCap(character.level)) character.skills[k]=Number(character.skills[k]||0)+1; rerender(); });
+  root.querySelectorAll('[data-growth]').forEach(btn=>btn.onclick=()=>{ const key=btn.dataset.growth==='vigor'?'growth_vigor':'growth_reserve'; const delta=Number(btn.dataset.delta); const used=Number(character.growth_vigor||0)+Number(character.growth_reserve||0); if(delta<0) character[key]=Math.max(0,Number(character[key]||0)-1); else if(used<growthPointBudget(character.level)) character[key]=Number(character[key]||0)+1; rerender(); });
+
+  if (!isMasterEditor) {
+    const levelButton = root.querySelector('#level-up');
+    if (levelButton) levelButton.onclick = async () => {
+      const updated = await withBusy(()=>api.levelUpCharacter(character.id),'Nível aumentado. Distribua os novos pontos fora de sessão.');
+      state.character = updated;
+      state.editingCharacter = structuredClone(updated);
+      await loadApp();
+    };
+  }
+
+  root.querySelector('#save-character').onclick = async () => {
+    character.first_name=root.querySelector('#char-first').value.trim();
+    character.last_name=root.querySelector('#char-last').value.trim();
+    character.nickname=root.querySelector('#char-nick').value.trim();
+    character.technique_name=root.querySelector('#tech-name').value.trim();
+    character.technique_description=root.querySelector('#tech-desc').value.trim();
+    character.image_url=root.querySelector('#image-url').value.trim();
+    character.biography=root.querySelector('#bio').value;
+    character.personality=root.querySelector('#personality').value;
+    character.goals=root.querySelector('#goals').value;
+    character.appearance=root.querySelector('#appearance').value;
+    character.notes=root.querySelector('#notes').value;
+
+    if (isMasterEditor) {
+      character.grade=root.querySelector('#char-grade').value;
+      character.level=Number(root.querySelector('#char-level').value);
+      character.xp=Number(root.querySelector('#char-xp').value);
+      character.entity_type=root.querySelector('#char-type').value;
+      character.permanent_ps_bonus=Number(root.querySelector('#perm-ps').value);
+      character.permanent_ea_bonus=Number(root.querySelector('#perm-ea').value);
+    }
+
+    const file = root.querySelector('#image-file').files?.[0];
+    if (file) {
+      const userId = state.authSession.user.id;
+      const result = await withBusy(()=>api.uploadCharacterImage(userId,character.id,file));
+      character.image_url=result.publicUrl;
+      character.image_path=result.path;
+    }
+
+    const check=validateBuild(character);
+    if(!check.valid) return toast(check.errors[0],'bad');
+
+    if(isMasterEditor) {
+      const saved=await withBusy(()=>api.masterSaveCharacter(character),'Entidade salva.');
+      state.masterSelectedCharacter=saved;
+      state.masterCharacters=await api.listAllCharacters();
+    } else {
+      const saved=await withBusy(()=>api.saveCharacter(character),'Ficha salva.');
+      if (saved.entity_type === 'player') {
+        state.character=saved;
+        state.editingCharacter=structuredClone(saved);
+      } else {
+        state.summonSelected=structuredClone(saved);
+      }
+    }
+    renderShell();
+  };
+
+  root.querySelector('#export-character').onclick = async()=>{
+    const json=await withBusy(()=>api.exportCharacterJson(character.id));
+    downloadJson(`${getName(character).replace(/\s+/g,'_')}.json`,json);
+  };
+}
+
+function renderSystemPage() {
+  const root=document.querySelector('#page');
+  root.innerHTML=`
+    ${pageHeader('Compêndio do sistema', 'Sistema')}
+    <div class="notice">O atributo listado em uma perícia é seu atributo padrão. Uma habilidade ou situação específica pode determinar outra combinação quando o funcionamento justificar isso.</div>
+    <div style="height:14px"></div>
+    <section class="card">
+      <h2>Atributos e Perícias</h2>
+      <div class="rule-list">
+        ${ATTRIBUTES.map(attr=>`<details class="rule-row"><summary>${attr.name}</summary><p>${attr.description}</p><div class="list">${SKILLS.filter(s=>s.attribute===attr.key).map(s=>`<div class="list-item"><div class="title">${s.name}</div><div class="body">${s.description}</div></div>`).join('')}</div></details>`).join('')}
+      </div>
+    </section>
+    <div style="height:14px"></div>
+    <section class="grid grid-2">
+      <div class="card"><h2>Teste universal</h2><p><strong>1d20 + Modificador do Atributo + Nível da Perícia</strong></p><p class="muted">Modificador do atributo = valor do atributo dividido por 2, arredondado para baixo.</p></div>
+      <div class="card"><h2>Defesa passiva</h2><p>A CA é o maior resultado entre Reflexos, Defender, Fortitude e Reforço.</p><p class="muted">Se um ataque superar a CA, o alvo ainda pode gastar PA para reagir quando possuir uma reação válida.</p></div>
+      <div class="card"><h2>Crítico e Kokusen</h2><p>20 natural é crítico e pode ser elegível a Kokusen quando Energia Amaldiçoada estiver envolvida e o golpe realmente conectar.</p><p class="muted">Crítico forçado ou faixa de crítico ampliada não transforma outros resultados em Kokusen.</p></div>
+      <div class="card"><h2>Pontos de Ação</h2><p>PA são universais e podem ser gastos em ações, técnicas e reações. PA não usados permanecem até o início do próximo turno e então são redefinidos ao máximo.</p></div>
+    </section>
+    <div style="height:14px"></div>
+    <section class="card"><h2>Condições</h2><div class="list">${state.conditions.length?state.conditions.map(c=>`<div class="list-item"><div class="title">${esc(c.name)}</div><div class="body">${esc(c.description)}</div></div>`).join(''):'<p class="muted">Nenhuma condição cadastrada.</p>'}</div></section>
+  `;
+}
+
+async function renderAbilitiesPage() {
+  const root=document.querySelector('#page');
+  root.innerHTML=`${pageHeader('Construção e aprovação', 'Habilidades')}<div class="card">Carregando...</div>`;
+  const [abilities, childSheets]=await Promise.all([api.getAbilities(state.character.id), api.getChildSheets(state.character.id)]);
+  const budget=slotBudget(state.character.level);
+  root.innerHTML=`
+    ${pageHeader('Construção e aprovação', 'Habilidades')}
+    <section class="grid grid-2">
+      <div class="card">
+        <h2>Nova habilidade</h2>
+        <form id="ability-form" class="grid">
+          <label>Categoria<select name="category">${ABILITY_CATEGORIES.map(c=>`<option value="${c.key}">${c.name}</option>`).join('')}</select></label>
+          <label>Nome<input name="name" required /></label>
+          <label>Descrição narrativa<textarea name="description"></textarea></label>
+          <label>Mecânica<textarea name="mechanics" placeholder="Efeito, teste, duração, limitações..."></textarea></label>
+          <div class="field-row-3">
+            <label>PA<input name="pa" type="number" min="0" max="7" value="1" /></label>
+            <label>EA<input name="ea" type="number" min="0" value="3" /></label>
+            <label>Dado de dano<select name="die"><option value="0">Sem dano</option>${[4,6,8,10,12,20].map(v=>`<option value="${v}">d${v}</option>`).join('')}</select></label>
+          </div>
+          <div class="field-row-3"><label>Quantidade de dados<input name="diceCount" type="number" min="0" max="12" value="0" /></label><label>Alcance<select name="range">${Object.entries(VP_OPTIONS.range).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')}</select></label><label>Alvos<select name="targets">${Object.entries(VP_OPTIONS.targets).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')}</select></label></div>
+          <div class="field-row"><label>Duração<select name="duration">${Object.entries(VP_OPTIONS.duration).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')}</select></label><label>Severidade da condição<select name="condition">${Object.entries(VP_OPTIONS.conditionSeverity).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')}</select></label></div><label>Condição aplicada<select name="conditionKey"><option value="">Nenhuma / efeito próprio</option>${state.conditions.map(c=>`<option value="${c.key}">${esc(c.name)}</option>`).join('')}</select></label>
+          <div class="field-row"><label><input name="onceCombat" type="checkbox" style="width:auto" /> 1 vez por combate</label><label><input name="onceMission" type="checkbox" style="width:auto" /> 1 vez por missão</label></div>
+          <div class="field-row"><label><input name="preparation" type="checkbox" style="width:auto" /> Exige preparação</label><label><input name="drawback" type="checkbox" style="width:auto" /> Desvantagem relevante</label></div>
+          <div class="notice" id="vp-preview">VP estimado: 1</div>
+          <button class="btn primary">Enviar para aprovação</button>
+        </form>
+      </div>
+      <div class="card">
+        <h2>Capacidade atual</h2>
+        ${['technique','general','manifestation','transformation'].map(k=>`<div class="list-item"><div class="title">${ABILITY_CATEGORIES.find(c=>c.key===k)?.name}</div><div class="meta">${budget[k].slots} slots • ${budget[k].vp} VP total • ${budget[k].maxSingle} VP máximo por habilidade</div></div>`).join('')}
+        <div class="notice" style="margin-top:10px">O VP do construtor é uma estimativa para triagem. Aprovação e VP final pertencem ao mestre.</div>
+      </div>
+    </section>
+    <div style="height:14px"></div>
+    <section class="card"><h2>Minhas habilidades</h2><div class="list">${abilities.length?abilities.map(a=>abilityCard(a)).join(''):'<p class="muted">Nenhuma habilidade enviada ainda.</p>'}</div></section>
+    <div style="height:14px"></div>
+    <section class="grid grid-2"><div class="card"><h2>Fichas filhas de invocação</h2><p class="muted">Uma ficha filha pode ser criada quando existe ao menos uma Manifestação aprovada.</p><form id="summon-form" class="field-row"><label>Nome da invocação<input name="name" required /></label><button class="btn primary" style="align-self:end">Criar ficha filha</button></form></div><div class="card"><h2>Invocações</h2><div class="list">${childSheets.length?childSheets.map(c=>`<button class="list-item" style="text-align:left;color:inherit;width:100%" data-select-summon="${c.id}"><div class="title">${esc(getName(c))}</div><div class="meta">Nv ${c.level}</div></button>`).join(''):'<p class="muted">Nenhuma ficha filha.</p>'}</div></div></section>
+    ${state.summonSelected?`<div style="height:14px"></div><section id="summon-editor"></section>`:''}`;
+
+  const form=root.querySelector('#ability-form');
+  const getConfig=()=>{
+    const f=new FormData(form);
+    return {
+      pa_cost:Number(f.get('pa')||0), ea_cost:Number(f.get('ea')||0), damage_die:Number(f.get('die')||0), damage_dice_count:Number(f.get('diceCount')||0),
+      range:f.get('range'), targets:f.get('targets'), duration:f.get('duration'), condition_severity:f.get('condition'), condition_key:f.get('conditionKey')||null, once_per_combat:f.get('onceCombat')==='on', once_per_mission:f.get('onceMission')==='on', requires_preparation:f.get('preparation')==='on', meaningful_drawback:f.get('drawback')==='on',
+    };
+  };
+  const updateVp=()=>root.querySelector('#vp-preview').textContent=`VP estimado: ${estimateAbilityVP(getConfig())}`;
+  form.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',updateVp));
+  updateVp();
+  bindConditionLinks(root);
+  root.querySelector('#summon-form').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);state.summonSelected=await withBusy(()=>api.createSummonSheet(state.character.id,f.get('name')),'Ficha filha criada.');renderAbilitiesPage();};
+  root.querySelectorAll('[data-select-summon]').forEach(btn=>btn.onclick=()=>{state.summonSelected=structuredClone(childSheets.find(c=>c.id===btn.dataset.selectSummon));renderAbilitiesPage();});
+  if(state.summonSelected){renderCharacterEditor(state.summonSelected,false,root.querySelector('#summon-editor'));}
+  form.onsubmit=async e=>{
+    e.preventDefault();
+    const f=new FormData(form); const config=getConfig(); const vp=estimateAbilityVP(config);
+    await withBusy(()=>api.createAbility({character_id:state.character.id,category:f.get('category'),name:f.get('name'),description:f.get('description'),mechanics:f.get('mechanics'),config,vp_estimated:vp,status:'pending'}),'Habilidade enviada.');
+    renderAbilitiesPage();
+  };
+}
+
+function abilityCard(a, master=false) {
+  const statusClass=a.status==='approved'?'good':a.status==='rejected'?'bad':'warn';
+  return `<div class="list-item" data-ability-id="${a.id}"><div class="btn-row"><div class="title">${esc(a.name)}</div><span class="pill ${statusClass}">${esc(a.status)}</span><span class="pill">VP ${a.vp_approved??a.vp_estimated}</span></div><div class="meta">${esc(ABILITY_CATEGORIES.find(c=>c.key===a.category)?.name||a.category)} ${a.config?.condition_key?`• <button class="btn ghost" data-condition-key="${esc(a.config.condition_key)}">Ver condição</button>`:''}</div><div class="body">${esc(a.description)}${a.mechanics?`\n\n${esc(a.mechanics)}`:''}</div>${a.master_response?`<div class="notice" style="margin-top:8px">Mestre: ${esc(a.master_response)}</div>`:''}${master&&a.status==='pending'?`<div class="btn-row" style="margin-top:9px"><button class="btn good" data-approve-ability="${a.id}">Aprovar</button><button class="btn bad" data-reject-ability="${a.id}">Rejeitar</button></div>`:''}</div>`;
+}
+
+async function renderTrainingPage() {
+  const root=document.querySelector('#page');
+  root.innerHTML=`${pageHeader('Dias livres e atividades', 'Treino')}<div class="card">Carregando...</div>`;
+  const [balance,tickets,requests]=await Promise.all([api.getFreeTimeBalance(state.character.id),api.getTrainingTickets(state.character.id),api.getMasterRequests(state.character.id)]);
+  const available=balance?balance.granted-balance.committed-balance.spent:0;
+  root.innerHTML=`
+    ${pageHeader('Dias livres e atividades', 'Treino', `<span class="pill">Disponíveis ${available}</span>`)}
+    <div class="notice">Dias livres representam o que o personagem decidiu fazer com o próprio tempo. Recompensas e requisitos ocultos não são exibidos aqui.</div>
+    <div style="height:14px"></div>
+    <section class="grid grid-2"><div class="card"><h2>Usar tempo livre</h2><form id="training-form" class="grid"><label>Atividade<input name="activity" required placeholder="O que o personagem fará?" /></label><label>Dias<input name="days" type="number" min="1" max="${Math.max(1,available)}" value="1" required /></label><label>Descrição opcional<textarea name="description"></textarea></label><button class="btn primary" ${available<=0?'disabled':''}>Enviar ticket</button></form></div><div class="card"><h2>Saldo</h2><div class="grid grid-3"><div class="stat"><span class="label">Concedidos</span><span class="value">${balance?.granted||0}</span></div><div class="stat"><span class="label">Reservados</span><span class="value">${balance?.committed||0}</span></div><div class="stat"><span class="label">Gastos</span><span class="value">${balance?.spent||0}</span></div></div></div></section>
+    <div style="height:14px"></div><section class="card"><h2>Tickets</h2><div class="list">${tickets.length?tickets.map(trainingCard).join(''):'<p class="muted">Nenhum ticket.</p>'}</div></section>
+    <div style="height:14px"></div><section class="grid grid-2"><div class="card"><h2>Nota ao mestre</h2><form id="request-form" class="grid"><label>Título<input name="title" required placeholder="Ex.: alteração permanente percebida" /></label><label>Mensagem<textarea name="message" required></textarea></label><button class="btn primary">Enviar nota</button></form></div><div class="card"><h2>Minhas solicitações</h2><div class="list">${requests.length?requests.map(r=>`<div class="list-item"><div class="btn-row"><div class="title">${esc(r.title)}</div><span class="pill ${r.status==='answered'?'good':r.status==='rejected'?'bad':'warn'}">${esc(r.status)}</span></div><div class="body">${esc(r.message)}</div>${r.master_response?`<div class="notice" style="margin-top:8px">${esc(r.master_response)}</div>`:''}</div>`).join(''):'<p class="muted">Nenhuma nota.</p>'}</div></div></section>`;
+  root.querySelector('#training-form').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);await withBusy(()=>api.submitTrainingTicket(state.character.id,f.get('activity'),f.get('description'),f.get('days')),'Tempo reservado e ticket enviado.');renderTrainingPage();};
+  root.querySelector('#request-form').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);await withBusy(()=>api.createMasterRequest(state.character.id,f.get('title'),f.get('message')),'Nota enviada ao mestre.');renderTrainingPage();};
+}
+
+function trainingCard(t, master=false) {
+  const cls=t.status==='approved'?'good':t.status==='rejected'?'bad':'warn';
+  return `<div class="list-item"><div class="btn-row"><div class="title">${esc(t.activity)}</div><span class="pill ${cls}">${esc(t.status)}</span><span class="pill">${t.days_requested} dia(s)</span></div>${master?`<div class="meta">${esc(getName(t.characters))}</div>`:''}<div class="body">${esc(t.description||'')}</div>${t.master_response?`<div class="notice" style="margin-top:8px">${esc(t.master_response)}</div>`:''}${master&&t.status==='pending'?`<div class="btn-row" style="margin-top:8px"><button class="btn good" data-training-approve="${t.id}">Aprovar</button><button class="btn bad" data-training-reject="${t.id}">Rejeitar</button></div>`:''}</div>`;
+}
+
+async function renderVowsPage() {
+  const root=document.querySelector('#page');
+  const vows=await withBusy(()=>api.getVows(state.character.id));
+  root.innerHTML=`${pageHeader('Restrições e benefícios', 'Votos Vinculativos')}<section class="grid grid-2"><div class="card"><h2>Propor voto</h2><form id="vow-form" class="grid"><label>Nome<input name="name" required /></label><label>Restrição<textarea name="restriction" required></textarea></label><label>Benefício pretendido<textarea name="benefit" required></textarea></label><label>Condição de quebra<textarea name="break" required></textarea></label><label>Duração<select name="duration"><option value="permanent">Permanente</option><option value="temporary">Temporário</option></select></label><button class="btn primary">Enviar ao mestre</button></form></div><div class="card"><h2>Estados</h2><p class="muted">Um voto bloqueado pelo mestre permanece na ficha sem benefício e não pode ser reativado pelo jogador até que o mestre libere essa ação.</p></div></section><div style="height:14px"></div><section class="card"><h2>Meus votos</h2><div class="list">${vows.length?vows.map(vowCard).join(''):'<p class="muted">Nenhum voto.</p>'}</div></section>`;
+  root.querySelector('#vow-form').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);await withBusy(()=>api.createVow({character_id:state.character.id,name:f.get('name'),restriction:f.get('restriction'),benefit:f.get('benefit'),break_condition:f.get('break'),duration_type:f.get('duration'),status:'pending'}),'Voto enviado.');renderVowsPage();};
+  root.querySelectorAll('[data-vow-status]').forEach(btn=>btn.onclick=async()=>{await withBusy(()=>api.setVowStatus(btn.dataset.vowId,btn.dataset.vowStatus),'Estado do voto atualizado.');renderVowsPage();});
+}
+
+function vowCard(v, master=false) {
+  const cls=v.status==='active'?'good':v.status==='master_locked'||v.status==='rejected'?'bad':'warn';
+  const playerButton=v.status==='active'?`<button class="btn warn" data-vow-id="${v.id}" data-vow-status="player_disabled">Desativar: percebi uma quebra</button>`:v.status==='available_reactivation'?`<button class="btn good" data-vow-id="${v.id}" data-vow-status="active">Reativar voto</button>`:'';
+  return `<div class="list-item"><div class="btn-row"><div class="title">${esc(v.name)}</div><span class="pill ${cls}">${esc(v.status)}</span></div>${master?`<div class="meta">${esc(getName(v.characters))}</div>`:''}<div class="body"><strong>Restrição:</strong> ${esc(v.restriction)}\n<strong>Benefício:</strong> ${esc(v.benefit)}\n<strong>Quebra:</strong> ${esc(v.break_condition)}</div>${v.master_response?`<div class="notice" style="margin-top:8px">${esc(v.master_response)}</div>`:''}${master?`<div class="btn-row" style="margin-top:8px">${['active','master_locked','available_reactivation','rejected'].map(s=>`<button class="btn" data-master-vow="${v.id}" data-status="${s}">${s}</button>`).join('')}</div>`:`<div class="btn-row" style="margin-top:8px">${playerButton}</div>`}</div>`;
+}
+
+async function renderEquipmentPage() {
+  const root=document.querySelector('#page'); const items=await withBusy(()=>api.getEquipment(state.character.id));
+  root.innerHTML=`${pageHeader('Objetos e ferramentas', 'Inventário')}<section class="grid grid-2"><div class="card"><h2>Novo item</h2><form id="equipment-form" class="grid"><label>Nome<input name="name" required /></label><div class="field-row"><label>Tipo<input name="type" value="Comum" /></label><label>Grau<input name="grade" value="Sem Grau" /></label></div><label>Descrição<textarea name="description"></textarea></label><label>Mecânica<textarea name="mechanics"></textarea></label><button class="btn primary">Adicionar</button></form></div><div class="card"><h2>Equipamentos</h2><div class="list">${items.length?items.map(i=>`<div class="list-item"><div class="title">${esc(i.name)}</div><div class="meta">${esc(i.equipment_type)} • ${esc(i.grade)}</div><div class="body">${esc(i.description)}${i.mechanics?`\n\n${esc(i.mechanics)}`:''}</div></div>`).join(''):'<p class="muted">Nenhum item.</p>'}</div></div></section>`;
+  root.querySelector('#equipment-form').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);await withBusy(()=>api.addEquipment({character_id:state.character.id,name:f.get('name'),equipment_type:f.get('type'),grade:f.get('grade'),description:f.get('description'),mechanics:f.get('mechanics')}),'Item adicionado.');renderEquipmentPage();};
+}
+
+async function renderHistoryPage() {
+  const root=document.querySelector('#page'); root.innerHTML=`${pageHeader('Registro de alterações', 'Histórico')}<div class="card">Carregando...</div>`;
+  const logs=await withBusy(()=>api.getAuditLogs(state.profile.role==='master'?null:state.character.id));
+  root.innerHTML=`${pageHeader('Registro de alterações', 'Histórico')}<section class="card"><div class="list">${logs.length?logs.map(l=>`<div class="list-item"><div class="title">${esc(l.table_name)} • ${esc(l.action)}</div><div class="meta">${formatDate(l.created_at)}</div><div class="body">${esc(l.summary)}</div></div>`).join(''):'<p class="muted">Sem alterações registradas.</p>'}</div></section>`;
+}
+
+async function renderMasterPage() {
+  const root=document.querySelector('#page');
+  state.masterCharacters=await withBusy(()=>api.listAllCharacters());
+  const [tickets,vows,requests] = await Promise.all([api.getTrainingTickets(),api.getVows(),api.getMasterRequests()]);
+  const pendingAbilitiesResult=await supabase.from('abilities').select('*, characters(first_name,last_name)').eq('status','pending').order('created_at');
+  const pendingAbilities=pendingAbilitiesResult.data||[];
+  root.innerHTML=`
+    ${pageHeader('Administração', 'Mestre', `<span class="pill">${state.masterCharacters.length} entidades</span>`)}
+    <section class="master-zone">
+      <div class="grid grid-2">
+        <div class="card"><h2>Sessão</h2>${state.activeSession?`<p><span class="pill bad">Ativa</span> ${esc(state.activeSession.title||'Sessão')}</p><form id="end-session-form"><div class="list">${state.masterCharacters.filter(c=>c.entity_type==='player').map(c=>`<div class="list-item"><div class="title">${esc(getName(c))}</div><div class="field-row"><label>XP<input type="number" min="0" value="0" data-award-xp="${c.id}" /></label><label>Dias livres<input type="number" min="0" value="0" data-award-days="${c.id}" /></label></div></div>`).join('')}</div><button class="btn bad" style="margin-top:10px">Encerrar sessão</button></form>`:`<form id="start-session-form" class="grid"><label>Título<input name="title" placeholder="Sessão" /></label><button class="btn good">Iniciar sessão</button></form>`}</div>
+        <div class="card"><h2>Criar entidade</h2><form id="entity-form" class="grid"><div class="field-row"><label>Nome<input name="first" required /></label><label>Sobrenome<input name="last" /></label></div><div class="field-row-3"><label>Tipo<select name="type">${ENTITY_TYPES.filter(t=>t.key!=='player').map(t=>`<option value="${t.key}">${t.name}</option>`).join('')}</select></label><label>Nível<input name="level" type="number" min="1" max="100" value="5" /></label><label>Grau<select name="grade">${GRADE_OPTIONS.map(g=>`<option>${g}</option>`).join('')}</select></label></div><button class="btn primary">Criar e editar</button></form></div>
+      </div>
+    </section>
+    <div style="height:14px"></div>
+    <section class="grid grid-2">
+      <div class="card"><h2>Entidades</h2><div class="list">${state.masterCharacters.map(c=>`<button class="list-item" style="text-align:left;color:inherit;width:100%" data-select-entity="${c.id}"><div class="title">${esc(getName(c))}</div><div class="meta">${esc(c.entity_type)} • Nv ${c.level} • ${esc(c.grade)}</div></button>`).join('')}</div></div>
+      <div class="card"><h2>Fila de habilidades</h2><div class="list">${pendingAbilities.length?pendingAbilities.map(a=>`<div class="list-item"><div class="title">${esc(a.name)}</div><div class="meta">${esc(getName(a.characters))} • VP estimado ${a.vp_estimated}</div><div class="body">${esc(a.description)}\n${esc(a.mechanics)}</div><div class="field-row" style="margin-top:8px"><label>VP aprovado<input type="number" min="1" value="${a.vp_estimated}" data-vp-approved="${a.id}" /></label><label>Resposta<input data-ability-response="${a.id}" /></label></div><div class="btn-row" style="margin-top:8px"><button class="btn good" data-approve-ability="${a.id}">Aprovar</button><button class="btn bad" data-reject-ability="${a.id}">Rejeitar</button></div></div>`).join(''):'<p class="muted">Nada pendente.</p>'}</div></div>
+    </section>
+    <div style="height:14px"></div>
+    <section class="grid grid-2"><div class="card"><h2>Treinamentos pendentes</h2><div class="list">${tickets.filter(t=>t.status==='pending').map(t=>trainingCard(t,true)).join('')||'<p class="muted">Nada pendente.</p>'}</div></div><div class="card"><h2>Votos</h2><div class="list">${vows.map(v=>vowCard(v,true)).join('')||'<p class="muted">Nenhum voto.</p>'}</div></div></section>
+    <div style="height:14px"></div><section class="card"><h2>Notas ao mestre</h2><div class="list">${requests.filter(r=>r.status==='pending').map(r=>`<div class="list-item"><div class="title">${esc(r.title)}</div><div class="meta">${esc(getName(r.characters))}</div><div class="body">${esc(r.message)}</div><div class="field-row" style="margin-top:8px"><label>Resposta<input data-request-response="${r.id}" /></label><div class="btn-row" style="align-self:end"><button class="btn good" data-request-answer="${r.id}">Responder</button><button class="btn bad" data-request-reject="${r.id}">Rejeitar</button></div></div></div>`).join('')||'<p class="muted">Nada pendente.</p>'}</div></section>
+    <div style="height:14px"></div><section class="card"><h2>Condições do sistema</h2><div class="grid grid-2"><form id="condition-form" class="grid"><label>Chave técnica<input name="key" placeholder="ex: frozen" required /></label><label>Nome<input name="name" required /></label><label>Descrição<textarea name="description" required></textarea></label><button class="btn primary">Adicionar / atualizar</button></form><div class="list">${state.conditions.map(c=>`<div class="list-item"><div class="title">${esc(c.name)}</div><div class="body">${esc(c.description)}</div><button class="btn bad" data-condition-disable="${c.id}">Desativar</button></div>`).join('')}</div></div></section>
+    ${state.masterSelectedCharacter?`<div style="height:14px"></div><section id="master-editor"></section>`:''}
+  `;
+
+  root.querySelector('#start-session-form')?.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.currentTarget);state.activeSession=await withBusy(()=>api.startSession(f.get('title')),'Sessão iniciada.');try{await api.triggerBackup('session-start');toast('Backup do início da sessão enviado.','good');}catch(err){toast(`Sessão iniciou, mas o backup falhou: ${err.message}`,'warn');}renderMasterPage();});
+  root.querySelector('#end-session-form')?.addEventListener('submit',async e=>{e.preventDefault();const awards={};state.masterCharacters.filter(c=>c.entity_type==='player').forEach(c=>{awards[c.id]={xp:Number(root.querySelector(`[data-award-xp="${c.id}"]`).value||0),days:Number(root.querySelector(`[data-award-days="${c.id}"]`).value||0)};});await withBusy(()=>api.endSession(awards),'Sessão encerrada.');state.activeSession=null;try{await api.triggerBackup('session-end');toast('Backup do encerramento enviado.','good');}catch(err){toast(`Sessão encerrou, mas o backup falhou: ${err.message}`,'warn');}renderMasterPage();});
+  root.querySelector('#entity-form').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);const entity=await withBusy(()=>api.createMasterEntity({entityType:f.get('type'),firstName:f.get('first'),lastName:f.get('last'),level:Number(f.get('level')),grade:f.get('grade')}),'Entidade criada.');state.masterSelectedCharacter=entity;renderMasterPage();};
+  root.querySelectorAll('[data-select-entity]').forEach(btn=>btn.onclick=()=>{state.masterSelectedCharacter=structuredClone(state.masterCharacters.find(c=>c.id===btn.dataset.selectEntity));renderMasterPage();});
+  root.querySelectorAll('[data-training-approve]').forEach(btn=>btn.onclick=async()=>{await withBusy(()=>api.resolveTrainingTicket(btn.dataset.trainingApprove,'approved',''),'Treino aprovado.');renderMasterPage();});
+  root.querySelectorAll('[data-training-reject]').forEach(btn=>btn.onclick=async()=>{const response=prompt('Motivo/resposta ao jogador:')||'';await withBusy(()=>api.resolveTrainingTicket(btn.dataset.trainingReject,'rejected',response),'Treino rejeitado.');renderMasterPage();});
+  root.querySelectorAll('[data-master-vow]').forEach(btn=>btn.onclick=async()=>{await withBusy(()=>api.setVowStatus(btn.dataset.masterVow,btn.dataset.status),'Voto atualizado.');renderMasterPage();});
+  root.querySelectorAll('[data-approve-ability]').forEach(btn=>btn.onclick=async()=>{const id=btn.dataset.approveAbility;const vp=Number(root.querySelector(`[data-vp-approved="${id}"]`)?.value||1);const response=root.querySelector(`[data-ability-response="${id}"]`)?.value||'';const ability=pendingAbilities.find(a=>a.id===id);const {error}=await supabase.from('abilities').update({status:'approved',vp_approved:vp,master_response:response,limit_override:ability?.category==='domain'}).eq('id',id);if(error)return toast(error.message,'bad');toast('Habilidade aprovada.','good');renderMasterPage();});
+  root.querySelectorAll('[data-reject-ability]').forEach(btn=>btn.onclick=async()=>{const id=btn.dataset.rejectAbility;const response=root.querySelector(`[data-ability-response="${id}"]`)?.value||prompt('Resposta:')||'';const {error}=await supabase.from('abilities').update({status:'rejected',master_response:response}).eq('id',id);if(error)return toast(error.message,'bad');toast('Habilidade rejeitada.','good');renderMasterPage();});
+  root.querySelector('#condition-form').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);await withBusy(()=>api.upsertSystemCondition({key:String(f.get('key')).trim(),name:String(f.get('name')).trim(),description:String(f.get('description')).trim(),active:true}),'Condição salva.');state.conditions=await api.getSystemConditions();renderMasterPage();};
+  root.querySelectorAll('[data-condition-disable]').forEach(btn=>btn.onclick=async()=>{await withBusy(()=>api.deactivateSystemCondition(btn.dataset.conditionDisable),'Condição desativada.');state.conditions=await api.getSystemConditions();renderMasterPage();});
+  root.querySelectorAll('[data-request-answer]').forEach(btn=>btn.onclick=async()=>{const id=btn.dataset.requestAnswer;const response=root.querySelector(`[data-request-response="${id}"]`)?.value||'';await withBusy(()=>api.resolveMasterRequest(id,'answered',response),'Solicitação respondida.');renderMasterPage();});
+  root.querySelectorAll('[data-request-reject]').forEach(btn=>btn.onclick=async()=>{const id=btn.dataset.requestReject;const response=root.querySelector(`[data-request-response="${id}"]`)?.value||'';await withBusy(()=>api.resolveMasterRequest(id,'rejected',response),'Solicitação rejeitada.');renderMasterPage();});
+  bindConditionLinks(root);
+
+  if(state.masterSelectedCharacter) {
+    const editor=root.querySelector('#master-editor');
+    editor.innerHTML='<div class="master-zone"><div id="master-char-editor"></div><div id="master-secret"></div></div>';
+    renderCharacterEditor(state.masterSelectedCharacter,true,editor.querySelector('#master-char-editor'));
+    renderMasterSecret(editor.querySelector('#master-secret'),state.masterSelectedCharacter);
+  }
+}
+
+async function renderMasterSecret(root,character){
+  const [secret,tracks,abilities,items]=await Promise.all([
+    api.getMasterSecret(character.id),
+    api.listMasterProgress(character.id),
+    api.getAbilities(character.id),
+    api.getEquipment(character.id),
+  ]);
+  const budgets=slotBudget(character.level);
+  root.innerHTML=`<div style="height:14px"></div>
+    <div class="secret-box"><h2>Informações exclusivas do mestre</h2><label>Segredos<textarea id="secret-text">${esc(secret?.secret_text||'')}</textarea></label><button class="btn bad" id="save-secret" style="margin-top:8px">Salvar segredo</button>
+    <h3>Progressos ocultos</h3><div class="list">${tracks.map(t=>`<div class="list-item"><div class="title">${esc(t.title)}</div><div class="meta">${t.current_points}${t.target_points!=null?` / ${t.target_points}`:''}</div><div class="body">${esc(t.master_notes||'')}</div></div>`).join('')||'<p class="muted">Nenhum progresso oculto.</p>'}</div>
+    <form id="track-form" class="grid" style="margin-top:10px"><div class="field-row"><label>Chave<input name="key" required /></label><label>Título<input name="title" required /></label></div><div class="field-row"><label>Pontos atuais<input name="current" type="number" value="0" /></label><label>Alvo oculto<input name="target" type="number" /></label></div><label>Notas do mestre<textarea name="notes"></textarea></label><label>Recompensa/efeito<textarea name="reward"></textarea></label><button class="btn">Adicionar/atualizar progresso</button></form></div>
+
+    <div style="height:14px"></div>
+    <div class="master-zone"><h2>Habilidades da entidade</h2>
+      <div class="grid grid-2">
+        <form id="master-ability-form" class="card grid">
+          <label>Categoria<select name="category">${ABILITY_CATEGORIES.map(c=>`<option value="${c.key}">${c.name}</option>`).join('')}</select></label>
+          <label>Nome<input name="name" required /></label>
+          <label>Descrição<textarea name="description"></textarea></label>
+          <label>Mecânica<textarea name="mechanics"></textarea></label>
+          <div class="field-row-3"><label>PA<input name="pa" type="number" min="0" max="7" value="1" /></label><label>EA<input name="ea" type="number" min="0" value="3" /></label><label>Dado<select name="die"><option value="0">Sem dano</option>${[4,6,8,10,12,20].map(v=>`<option value="${v}">d${v}</option>`).join('')}</select></label></div>
+          <div class="field-row-3"><label>Qtd. dados<input name="diceCount" type="number" min="0" max="12" value="0" /></label><label>Alcance<select name="range">${Object.entries(VP_OPTIONS.range).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')}</select></label><label>Alvos<select name="targets">${Object.entries(VP_OPTIONS.targets).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')}</select></label></div>
+          <div class="field-row"><label>Duração<select name="duration">${Object.entries(VP_OPTIONS.duration).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')}</select></label><label>Condição<select name="condition">${Object.entries(VP_OPTIONS.conditionSeverity).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')}</select></label></div>
+          <label>Condição do compêndio<select name="conditionKey"><option value="">Nenhuma</option>${state.conditions.map(c=>`<option value="${c.key}">${esc(c.name)}</option>`).join('')}</select></label>
+          <div class="field-row"><label><input name="onceCombat" type="checkbox" style="width:auto" /> 1x combate</label><label><input name="onceMission" type="checkbox" style="width:auto" /> 1x missão</label></div>
+          <div class="notice" id="master-vp-preview">VP estimado: 1</div>
+          <label>VP final aprovado<input name="vpApproved" type="number" min="1" value="1" /></label>
+          <label><input name="override" type="checkbox" style="width:auto" /> Ignorar limite normal (somente exceção narrativa do mestre)</label>
+          <button class="btn primary">Criar habilidade aprovada</button>
+        </form>
+        <div class="card"><h3>Orçamentos no nível ${character.level}</h3>${['technique','general','manifestation','transformation'].map(k=>`<div class="list-item"><div class="title">${ABILITY_CATEGORIES.find(c=>c.key===k)?.name}</div><div class="meta">${budgets[k].slots} slots • ${budgets[k].vp} VP • máx. individual ${budgets[k].maxSingle}</div></div>`).join('')}<h3>Existentes</h3><div class="list">${abilities.length?abilities.map(a=>abilityCard(a)).join(''):'<p class="muted">Nenhuma habilidade.</p>'}</div></div>
+      </div>
+    </div>
+
+    <div style="height:14px"></div>
+    <div class="master-zone"><h2>Equipamentos da entidade</h2><div class="grid grid-2"><form id="master-equipment-form" class="card grid"><label>Nome<input name="name" required /></label><div class="field-row"><label>Tipo<input name="type" value="Comum" /></label><label>Grau<input name="grade" value="Sem Grau" /></label></div><label>Descrição<textarea name="description"></textarea></label><label>Mecânica<textarea name="mechanics"></textarea></label><button class="btn">Adicionar equipamento</button></form><div class="card"><div class="list">${items.length?items.map(i=>`<div class="list-item"><div class="title">${esc(i.name)}</div><div class="meta">${esc(i.equipment_type)} • ${esc(i.grade)}</div><div class="body">${esc(i.description)}${i.mechanics?`\n\n${esc(i.mechanics)}`:''}</div></div>`).join(''):'<p class="muted">Nenhum equipamento.</p>'}</div></div></div></div>`;
+
+  root.querySelector('#save-secret').onclick=async()=>{await withBusy(()=>api.saveMasterSecret(character.id,root.querySelector('#secret-text').value),'Segredo salvo.');};
+  root.querySelector('#track-form').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);await withBusy(()=>api.upsertMasterProgress({character_id:character.id,key:f.get('key'),title:f.get('title'),current_points:Number(f.get('current')||0),target_points:f.get('target')===''?null:Number(f.get('target')),master_notes:f.get('notes'),reward_notes:f.get('reward')}),'Progresso oculto salvo.');renderMasterSecret(root,character);};
+
+  const abilityForm=root.querySelector('#master-ability-form');
+  const configFromMasterAbility=()=>{const f=new FormData(abilityForm);return {pa_cost:Number(f.get('pa')||0),ea_cost:Number(f.get('ea')||0),damage_die:Number(f.get('die')||0),damage_dice_count:Number(f.get('diceCount')||0),range:f.get('range'),targets:f.get('targets'),duration:f.get('duration'),condition_severity:f.get('condition'),condition_key:f.get('conditionKey')||null,once_per_combat:f.get('onceCombat')==='on',once_per_mission:f.get('onceMission')==='on'};};
+  const updateMasterVp=()=>{const vp=estimateAbilityVP(configFromMasterAbility());root.querySelector('#master-vp-preview').textContent=`VP estimado: ${vp}`;const field=abilityForm.elements.vpApproved;if(!field.dataset.touched)field.value=vp;};
+  abilityForm.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',()=>{if(el.name==='vpApproved')el.dataset.touched='1';updateMasterVp();}));
+  updateMasterVp();
+  abilityForm.onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);const config=configFromMasterAbility();const estimated=estimateAbilityVP(config);await withBusy(()=>api.createAbility({character_id:character.id,category:f.get('category'),name:f.get('name'),description:f.get('description'),mechanics:f.get('mechanics'),config,vp_estimated:estimated,vp_approved:Number(f.get('vpApproved')||estimated),limit_override:f.get('override')==='on',status:'approved'}),'Habilidade criada.');renderMasterSecret(root,character);};
+  root.querySelector('#master-equipment-form').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);await withBusy(()=>api.addEquipment({character_id:character.id,name:f.get('name'),equipment_type:f.get('type'),grade:f.get('grade'),description:f.get('description'),mechanics:f.get('mechanics')}),'Equipamento adicionado.');renderMasterSecret(root,character);};
+  bindConditionLinks(root);
+}
+
+async function renderPlayerCombatPage(){
+  const root=document.querySelector('#page');const encounters=await api.getEncounters();const active=encounters.find(e=>e.status==='active');
+  if(!active){subscribeCombatRealtime(null,()=>{});root.innerHTML=`${pageHeader('Sala de combate','Combate')}<div class="notice">Nenhum combate ativo.</div>`;return;}
+  subscribeCombatRealtime(active.id, renderPlayerCombatPage);
+  const participants=await api.getCombatParticipants(active.id);const mine=participants.find(p=>p.character_id===state.character.id);const rolls=await api.getRollLogs(active.id);
+  root.innerHTML=`${pageHeader(`Rodada ${active.round}`,'Combate')}<section class="grid grid-2"><div class="card"><h2>${esc(active.name)}</h2>${mine?combatParticipantCard(mine,false):'<p class="muted">Seu personagem ainda não foi adicionado.</p>'}</div><div class="card"><h2>Rolagem</h2><form id="player-roll" class="grid"><label>Perícia<select name="skill">${SKILLS.map(s=>`<option value="${s.key}">${s.name}</option>`).join('')}</select></label><button class="btn primary">Rolar d20</button></form><div class="list" style="margin-top:10px">${rolls.map(r=>rollCard(r)).join('')}</div></div></section>`;
+  root.querySelector('#player-roll').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);const skill=SKILLS.find(s=>s.key===f.get('skill'));const bonus=attributeModifier(state.character.attributes[skill.attribute])+Number(state.character.skills[skill.key]||0);const r=rollD20({bonus});await api.logRoll({encounter_id:active.id,character_id:state.character.id,label:skill.name,roll_type:'skill',expression:'1d20',rolls:r.rolls,natural_roll:r.natural,bonus:r.bonus,total:r.total,is_critical:r.naturalCritical,kokusen_eligible:r.kokusenEligible,visibility:'public'});toast(`${skill.name}: ${r.total}`,'good');renderPlayerCombatPage();};
+}
+
+function combatParticipantCard(p,master){
+  const c=p.characters;const d=characterDerived(c);return `<div class="list-item"><div class="title">${esc(getName(c))}</div><div class="meta">Iniciativa ${p.initiative}</div><div class="grid grid-3" style="margin-top:10px"><div><span class="muted small">PS</span><div><strong>${p.current_ps??d.ps}</strong> / ${d.ps}</div></div><div><span class="muted small">EA</span><div><strong>${p.current_ea??d.ea}</strong> / ${d.ea}</div></div><div><span class="muted small">PA</span><div><strong>${p.current_pa??d.pa}</strong> / ${d.pa}</div></div></div>${master?`<div class="field-row-3" style="margin-top:10px"><label>PS<input data-cps="${p.id}" type="number" value="${p.current_ps??d.ps}" /></label><label>EA<input data-cea="${p.id}" type="number" value="${p.current_ea??d.ea}" /></label><label>PA<input data-cpa="${p.id}" type="number" value="${p.current_pa??d.pa}" /></label></div><button class="btn" data-save-combat="${p.id}" style="margin-top:8px">Salvar recursos</button>`:''}</div>`;
+}
+
+function rollCard(r){return `<div class="list-item"><div class="title">${esc(r.label)}: ${r.total}</div><div class="meta">${esc(r.expression)} • dados ${esc(JSON.stringify(r.rolls))} ${r.is_critical?'• CRÍTICO':''}</div></div>`;}
+
+async function renderMasterCombatPage(){
+  const root=document.querySelector('#page');const encounters=await api.getEncounters();state.activeEncounter=encounters.find(e=>e.status==='active')||null;state.masterCharacters=await api.listAllCharacters();
+  if(!state.activeEncounter){subscribeCombatRealtime(null,()=>{});root.innerHTML=`${pageHeader('Controle secreto','Combate')}<section class="card"><h2>Novo combate</h2><form id="encounter-form" class="field-row"><label>Nome<input name="name" required /></label><button class="btn primary" style="align-self:end">Criar combate</button></form></section>`;root.querySelector('#encounter-form').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);await api.createEncounter(f.get('name'));renderMasterCombatPage();};return;}
+  subscribeCombatRealtime(state.activeEncounter.id, renderMasterCombatPage);
+  state.encounterParticipants=await api.getCombatParticipants(state.activeEncounter.id);const rolls=await api.getRollLogs(state.activeEncounter.id);
+  const inCombat=new Set(state.encounterParticipants.map(p=>p.character_id));
+  root.innerHTML=`${pageHeader(`Rodada ${state.activeEncounter.round}`,'Combate do Mestre',`<span class="pill bad">Rolagens do mestre são secretas</span>`)}<section class="grid grid-2"><div class="card"><h2>Participantes</h2><div class="list">${state.encounterParticipants.map(p=>combatParticipantCard(p,true)).join('')||'<p class="muted">Vazio.</p>'}</div><h3>Adicionar</h3><div class="btn-row">${state.masterCharacters.filter(c=>!inCombat.has(c.id)).map(c=>`<button class="btn" data-add-combat="${c.id}">${esc(getName(c))}</button>`).join('')}</div></div><div class="card"><h2>Rolagem secreta</h2><form id="master-roll" class="grid"><label>Entidade<select name="character">${state.encounterParticipants.map(p=>`<option value="${p.character_id}">${esc(getName(p.characters))}</option>`).join('')}</select></label><label>Perícia<select name="skill">${SKILLS.map(s=>`<option value="${s.key}">${s.name}</option>`).join('')}</select></label><label>Dados de desvantagem<input name="disadvantage" type="number" min="1" max="10" value="1" /></label><button class="btn bad">Rolar em segredo</button></form><h3>Log do mestre</h3><div class="list">${rolls.map(rollCard).join('')}</div></div></section>`;
+  root.querySelectorAll('[data-add-combat]').forEach(btn=>btn.onclick=async()=>{const c=state.masterCharacters.find(x=>x.id===btn.dataset.addCombat);await api.addCombatParticipant(state.activeEncounter.id,c);renderMasterCombatPage();});
+  root.querySelectorAll('[data-save-combat]').forEach(btn=>btn.onclick=async()=>{const id=btn.dataset.saveCombat;await api.updateCombatParticipant(id,{current_ps:Number(root.querySelector(`[data-cps="${id}"]`).value),current_ea:Number(root.querySelector(`[data-cea="${id}"]`).value),current_pa:Number(root.querySelector(`[data-cpa="${id}"]`).value)});toast('Recursos atualizados.','good');});
+  root.querySelector('#master-roll').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);const p=state.encounterParticipants.find(x=>x.character_id===f.get('character'));const skill=SKILLS.find(s=>s.key===f.get('skill'));const c=p.characters;const bonus=attributeModifier(c.attributes[skill.attribute])+Number(c.skills[skill.key]||0);const r=rollD20({bonus,disadvantageDice:Number(f.get('disadvantage')||1)});await api.logRoll({encounter_id:state.activeEncounter.id,character_id:c.id,label:skill.name,roll_type:'skill',expression:`${r.rolls.length}d20 menor`,rolls:r.rolls,natural_roll:r.natural,bonus:r.bonus,total:r.total,is_critical:r.naturalCritical,kokusen_eligible:r.kokusenEligible,visibility:'master'});toast(`Rolagem secreta: ${r.total}`,'good');renderMasterCombatPage();};
+}
+
+function subscribeCombatRealtime(encounterId, rerender) {
+  if (state.realtimeChannel) {
+    supabase.removeChannel(state.realtimeChannel);
+    state.realtimeChannel = null;
+  }
+  if (!encounterId) return;
+  let timer;
+  const refresh = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => rerender(), 180);
+  };
+  state.realtimeChannel = supabase
+    .channel(`combat-${encounterId}-${state.profile.role}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'combat_participants', filter: `encounter_id=eq.${encounterId}` }, refresh)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'roll_logs', filter: `encounter_id=eq.${encounterId}` }, refresh)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'combat_encounters', filter: `id=eq.${encounterId}` }, refresh)
+    .subscribe();
+}
+
+async function boot(){
+  if(!isConfigured) return setupScreen();
+  supabase.auth.onAuthStateChange((_event,session)=>{state.authSession=session;});
+  const {data}=await supabase.auth.getSession();
+  if(!data.session) return authScreen();
+  await loadApp();
+}
+
+boot();
