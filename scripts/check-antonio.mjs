@@ -23,14 +23,14 @@ for(const name of ['A Linha Que Separa','Explosão Artística','Eu Pintei Eles Q
   const a=find(name); assert(a,`Falta técnica de pintura: ${name}`); assert(a.config?.requires_combat_mode==='magic_brush',`${name} precisa exigir Pincel.`);
 }
 for(const name of ['Golpe de Explosão','Chute de Ruptura','Sequência Escaldante','Ponto de Ignição','Punho da Fornalha']) {
-  const a=find(name); assert(a,`Falta golpe: ${name}`); assert(a.config?.requires_combat_mode==='flame_monk',`${name} precisa exigir Postura.`); assert(a.config?.target_relation==='enemy',`${name} deve mirar inimigo.`);
+  const a=find(name); assert(a,`Falta golpe: ${name}`); assert(a.config?.requires_combat_mode==='flame_monk',`${name} precisa exigir Postura.`); assert(a.config?.target_relation==='other',`${name} deve mirar qualquer outro participante válido.`);
 }
 
 const linha=find('A Linha Que Separa');
 const overload=linha?.config?.overloads?.find(x=>x.key==='second_target');
 assert(overload,'A Linha precisa manter a Sobrecarga de segundo alvo.');
 assert(overload.overrides?.requires_secondary_target===true,'Sobrecarga precisa exigir um segundo alvo real.');
-assert(overload.overrides?.secondary_target_relation==='enemy','Segundo alvo precisa ser inimigo.');
+assert(overload.overrides?.secondary_target_relation==='other','Segundo alvo precisa ser qualquer outro participante válido.');
 assert(Number(overload.overrides?.secondary_target_die_factor)===0.5,'Somente os dados do segundo alvo devem ser reduzidos à metade.');
 assert(Number(overload.overrides?.secondary_target_flat_factor)===1,'O modificador do segundo alvo deve permanecer inteiro.');
 assert(find('Explosão Artística')?.config?.special_action==='place_delayed_bomb','Explosão Artística precisa criar bomba atrasada.');

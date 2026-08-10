@@ -133,14 +133,14 @@
             "extra_ea": 3,
             "overrides": {
               "requires_secondary_target": true,
-              "secondary_target_relation": "enemy",
+              "secondary_target_relation": "other",
               "secondary_target_die_factor": 0.5,
               "secondary_target_flat_factor": 1,
               "secondary_target_damage_factor": 1
             }
           }
         ],
-        "target_relation": "enemy"
+        "target_relation": "other"
       },
       "vp_estimated": 3,
       "vp_approved": 3,
@@ -182,7 +182,7 @@
         "bomb_damage_die": 8,
         "bomb_flat_bonus": 2,
         "bomb_flat_attribute_key": "cursed_control",
-        "target_relation": "enemy"
+        "target_relation": "other"
       },
       "vp_estimated": 4,
       "vp_approved": 4,
@@ -228,7 +228,7 @@
           "extinguish_pa_cost": 1,
           "refresh_only_if_existing": true
         },
-        "target_relation": "enemy"
+        "target_relation": "other"
       },
       "vp_estimated": 4,
       "vp_approved": 4,
@@ -346,7 +346,7 @@
           "strength",
           "cursed_control"
         ],
-        "target_relation": "enemy"
+        "target_relation": "other"
       },
       "vp_estimated": 2,
       "vp_approved": 2,
@@ -427,7 +427,7 @@
             }
           }
         ],
-        "target_relation": "enemy"
+        "target_relation": "other"
       },
       "vp_estimated": 3,
       "vp_approved": 3,
@@ -468,7 +468,7 @@
           "cursed_control"
         ],
         "prior_turn_same_target_attack_bonus": 1,
-        "target_relation": "enemy"
+        "target_relation": "other"
       },
       "vp_estimated": 3,
       "vp_approved": 3,
@@ -518,7 +518,7 @@
           "extinguish_pa_cost": 1,
           "refresh_only_if_existing": false
         },
-        "target_relation": "enemy"
+        "target_relation": "other"
       },
       "vp_estimated": 3,
       "vp_approved": 3,
@@ -571,7 +571,7 @@
             "decrement_on": "target_end"
           }
         },
-        "target_relation": "enemy"
+        "target_relation": "other"
       },
       "vp_estimated": 4,
       "vp_approved": 4,

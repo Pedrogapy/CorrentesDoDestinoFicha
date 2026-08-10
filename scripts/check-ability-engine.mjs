@@ -9,7 +9,7 @@ const main=read('src/main.js');
 const css=read('src/styles.css');
 const migration=read('supabase/migrations/202608100004_ability_engine_v08.sql');
 
-assert(SYSTEM_VERSION==='0.8.0','SYSTEM_VERSION precisa ser 0.8.0.');
+assert(SYSTEM_VERSION==='0.8.1','SYSTEM_VERSION precisa ser 0.8.1.');
 
 // O bug da captura: a UI precisa nascer com o campo e também ligar seus eventos
 // depois que o HTML do combate é inserido no DOM, em player e Mestre.
@@ -49,7 +49,7 @@ const over=linha?.config?.overloads?.find(o=>o.key==='second_target');
 assert(over?.overrides?.requires_secondary_target===true,'A Linha precisa exigir segundo alvo na Sobrecarga.');
 assert(Number(over?.overrides?.secondary_target_die_factor)===0.5,'Segundo alvo de A Linha precisa receber metade dos dados.');
 assert(Number(over?.overrides?.secondary_target_flat_factor)===1,'Segundo alvo de A Linha precisa manter o modificador inteiro.');
-assert(over?.overrides?.secondary_target_relation==='enemy','Segundo alvo de A Linha precisa ser inimigo.');
+assert(over?.overrides?.secondary_target_relation==='other','Segundo alvo de A Linha precisa aceitar qualquer outro participante válido.');
 const arrows=antonio.abilities.find(a=>a.name==='As Setas Indicam a Direção');
 assert(arrows?.config?.recent_action_actor_relation==='ally_or_self','As Setas só podem corrigir ataque de Antônio ou aliado.');
 assert(migration.includes('recent_action_actor_relation'),'O servidor precisa validar a origem da ação recente apoiada.');
@@ -64,4 +64,4 @@ for(const forbidden of ['demônio','demonio','possessão','possessao']) {
 assert((migration.match(/\$\$/g)||[]).length%2===0,'Migration possui bloco $$ não fechado.');
 assert(!migration.includes('characters(*)'),'Migration não deve reintroduzir embed ambíguo de characters.');
 
-console.log('OK: motor v0.8, segundo alvo, relações de alvo, construtor estruturado, rerrolagens e segurança pública validados.');
+console.log('OK: motor v0.8.1, segundo alvo, relações de alvo, construtor estruturado, rerrolagens e segurança pública validados.');

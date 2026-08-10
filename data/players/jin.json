@@ -111,7 +111,7 @@
           "blood_technique"
         ],
         "damage_flat_bonus": 2,
-        "target_relation": "enemy"
+        "target_relation": "other"
       },
       "vp_estimated": 3,
       "vp_approved": 3,
@@ -151,7 +151,7 @@
           "blood_technique"
         ],
         "damage_flat_bonus": 0,
-        "target_relation": "enemy"
+        "target_relation": "other"
       },
       "vp_estimated": 3,
       "vp_approved": 3,

@@ -9,7 +9,7 @@
  * - Não expor sistemas narrativamente secretos em telas de jogador apenas por estarem implementados no banco.
  */
 
-export const SYSTEM_VERSION = '0.8.0';
+export const SYSTEM_VERSION = '0.8.1';
 
 export const ATTRIBUTES = [
   {
@@ -140,6 +140,7 @@ export const GRADE_OPTIONS = ['Sem Grau', 'Grau 4', 'Grau 3', 'Grau 2', 'Grau 1'
 // contra o lado do participante no encontro, não apenas pelo tipo da ficha.
 export const TARGET_RELATIONS = [
   { key: 'any', name: 'Qualquer participante' },
+  { key: 'other', name: 'Qualquer outro participante' },
   { key: 'enemy', name: 'Inimigo' },
   { key: 'ally', name: 'Aliado (exceto o usuário)' },
   { key: 'ally_or_self', name: 'Aliado ou o próprio usuário' },

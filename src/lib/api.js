@@ -486,6 +486,24 @@ export async function createEncounter(name) {
   return data;
 }
 
+// Criação transacional: o encontro só nasce se todos os participantes escolhidos
+// puderem ser inseridos. Evita abrir um combate "pela metade" quando uma ficha
+// ou configuração de visibilidade estiver inválida.
+export async function createEncounterWithParticipants(name, participants=[]) {
+  const payload=(Array.isArray(participants)?participants:[]).map(p=>({
+    character_id:p.character_id,
+    side_key:p.side_key||'neutral',
+    visible_to_players:p.visible_to_players!==false,
+    targetable_by_players:p.targetable_by_players!==false,
+  }));
+  const { data, error } = await supabase.rpc('create_combat_encounter_with_participants', {
+    p_name: name,
+    p_participants: payload,
+  });
+  if (error) throw error;
+  return data;
+}
+
 // Encerra o combate sem apagar participantes, rolagens ou histórico.
 // A política RLS de combat_encounters permite esta alteração apenas ao Mestre.
 export async function endEncounter(encounterId) {
@@ -501,16 +519,30 @@ export async function endEncounter(encounterId) {
   });
 }
 
-export async function addCombatParticipant(encounterId, character) {
-  return withCombatUndo(encounterId, `Adicionar participante: ${[character.first_name,character.last_name].filter(Boolean).join(' ') || 'Entidade'}`, async()=>{
-    const { data, error } = await supabase
-      .from('combat_participants')
-      .insert({ encounter_id: encounterId, character_id: character.id })
-      .select('*')
-      .single();
+export async function addCombatParticipants(encounterId, participants=[]) {
+  const rows=(Array.isArray(participants)?participants:[]).map(p=>({
+    encounter_id: encounterId,
+    character_id: p.character_id,
+    side_key: p.side_key || 'neutral',
+    visible_to_players: p.visible_to_players !== false,
+    targetable_by_players: p.targetable_by_players !== false,
+  }));
+  if(!rows.length) return [];
+  return withCombatUndo(encounterId, rows.length===1?'Adicionar participante':`Adicionar ${rows.length} participantes`, async()=>{
+    const { data, error } = await supabase.from('combat_participants').insert(rows).select('*');
     if (error) throw error;
-    return data;
+    return data || [];
   });
+}
+
+export async function addCombatParticipant(encounterId, character, options={}) {
+  const rows=await addCombatParticipants(encounterId,[{
+    character_id: character.id,
+    side_key: options.side_key || (['curse','enemy'].includes(character.entity_type)?'enemy':'ally'),
+    visible_to_players: options.visible_to_players !== false,
+    targetable_by_players: options.targetable_by_players !== false,
+  }]);
+  return rows[0] || null;
 }
 
 export async function getCombatParticipants(encounterId) {

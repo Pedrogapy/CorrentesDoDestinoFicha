@@ -363,3 +363,90 @@ select[multiple]{
   .combat-side-field { width:100%; }
   .combat-side-field select { width:100%; }
 }
+
+/* ============================================================
+   Combate v0.8.1 — seleção, visibilidade e alvos por encontro
+   ============================================================ */
+.combat-picker-toolbar {
+  display:grid;
+  grid-template-columns:minmax(220px,1fr) auto;
+  gap:10px;
+  align-items:end;
+  margin-bottom:10px;
+}
+.combat-picker-toolbar label { margin:0; }
+.combat-visibility-help { margin-bottom:10px; }
+.combat-picker-list { display:grid; gap:8px; }
+.combat-picker-row {
+  display:grid;
+  grid-template-columns:minmax(210px,1.5fr) minmax(120px,.7fr) minmax(150px,.8fr) minmax(130px,.7fr);
+  gap:10px;
+  align-items:center;
+  padding:10px;
+  border:1px solid #303238;
+  border-left-width:4px;
+  background:#111217;
+}
+.combat-picker-select {
+  display:flex;
+  align-items:center;
+  gap:9px;
+  margin:0;
+}
+.combat-picker-select input,
+.combat-toggle input { width:auto; }
+.combat-picker-select span { display:flex; flex-direction:column; gap:2px; }
+.combat-toggle {
+  display:flex;
+  align-items:center;
+  gap:7px;
+  margin:0;
+  line-height:1.2;
+}
+.combat-picker-row.entity-type-player { border-left-color:#5fd6a1; }
+.combat-picker-row.entity-type-npc { border-left-color:#6ca7ed; }
+.combat-picker-row.entity-type-curse { border-left-color:#e85b74; }
+.combat-picker-row.entity-type-enemy { border-left-color:#d69b46; }
+.combat-picker-row.entity-type-summon { border-left-color:#a982e8; }
+.combat-add-controls { margin-top:12px; }
+#add-combat-panel {
+  margin-top:10px;
+  padding-top:10px;
+  border-top:1px solid #303238;
+}
+.combat-participant-visibility {
+  display:grid;
+  grid-template-columns:auto auto 1fr;
+  gap:12px;
+  align-items:center;
+  margin-top:9px;
+  padding:9px 10px;
+  border:1px solid #303238;
+  background:#0f1014;
+}
+.combat-visible-initiative { display:grid; gap:6px; }
+.combat-initiative-row {
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  align-items:center;
+  padding:8px 10px;
+  border:1px solid #303238;
+  background:#101116;
+}
+.combat-initiative-row > div:first-child { display:flex; flex-direction:column; gap:2px; }
+.combat-initiative-row.turn-active { border-color:#4f8f64; box-shadow:inset 3px 0 0 #4f8f64; }
+
+@media (max-width: 900px) {
+  .combat-picker-row { grid-template-columns:1fr 1fr; }
+  .combat-picker-select { grid-column:1 / -1; }
+  .combat-participant-visibility { grid-template-columns:1fr 1fr; }
+  .combat-participant-visibility .muted { grid-column:1 / -1; }
+}
+@media (max-width: 560px) {
+  .combat-picker-toolbar,
+  .combat-picker-row,
+  .combat-participant-visibility { grid-template-columns:1fr; }
+  .combat-picker-select { grid-column:auto; }
+  .combat-initiative-row { align-items:flex-start; flex-direction:column; }
+}

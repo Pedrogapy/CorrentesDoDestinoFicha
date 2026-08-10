@@ -294,7 +294,7 @@
             "damage_dice_count": 1,
             "damage_die": 6,
             "damage_flat_attribute_key": "cursed_control",
-            "target_relation": "enemy"
+            "target_relation": "other"
           },
           "vp_estimated": 2,
           "vp_approved": 2,
@@ -338,7 +338,7 @@
             "damage_dice_count": 1,
             "damage_die": 6,
             "damage_flat_attribute_key": "cursed_control",
-            "target_relation": "enemy"
+            "target_relation": "other"
           },
           "vp_estimated": 2,
           "vp_approved": 2,

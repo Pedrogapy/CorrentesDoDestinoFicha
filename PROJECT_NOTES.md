@@ -176,3 +176,16 @@ Regras canônicas implementadas no site:
 - Antônio: Pincel/Postura continuam estilos de combate. Explosão Artística, queimaduras, Setas, segundo alvo e Tecido de Desvio usam automação real. Setas só apoiam Antônio/aliado.
 - Arquivos públicos do Antônio não registram a explicação narrativa que o player desconhece.
 - A migration v0.8 limpa snapshots antigos de undo por incompatibilidade estrutural; novos snapshots incluem os campos v0.8 automaticamente.
+
+## v0.8.1 — seleção, visibilidade e alvos por encontro
+
+- `combat_participants.visible_to_players`: controla se um participante aparece no roster/iniciativa dos jogadores.
+- `combat_participants.targetable_by_players`: controla se jogadores podem selecioná-lo como alvo; `visible_to_players=false` sempre torna o alvo indisponível para players.
+- O Mestre ignora essas travas no painel próprio.
+- `get_combat_targets` agora é o roster seguro dos jogadores e devolve `side_key`, `initiative` e flags efetivas de alvo.
+- `combat_participants` NÃO teve sua policy aberta para todos. Um trigger toca `combat_encounters.updated_at` para provocar o refresh de Realtime sem expor PS/EA/PA de outras fichas.
+- Novo fluxo de início: selecionar participantes + pesquisar por nome + lado + visibilidade + alvo antes de criar o encontro.
+- Participantes podem ser adicionados em lote durante a luta e a adição entra no sistema de Desfazer.
+- Ataques básicos/armas podem mirar qualquer outro participante liberado, inclusive aliados. Habilidades continuam respeitando a relação cadastrada.
+- Nova relação estruturada `other`: "Qualquer outro participante". Técnicas ofensivas comuns dos players usam `other`; controles/suportes específicos podem continuar `enemy`, `ally`, `ally_or_self` ou `self`.
+- O Mestre pode alternar visibilidade e alvo em tempo real na própria carta do participante; cada toggle é mutação desfazível.

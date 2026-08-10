@@ -27,7 +27,7 @@ assert(escudo.config?.combat_effect?.damage_reduction_flat_attribute_key==='curs
 assert(escudo.config?.overloads?.find(o=>o.key==='second_impact')?.overrides?.effect_charges===2,'Sobrecarga do Escudo precisa proteger dois impactos.');
 assert(regen.config?.target_relation==='ally_or_self' && regen.config?.healing_dice_count===1 && regen.config?.healing_die===6,'Regeneração base precisa curar 1d6 em si/aliado.');
 assert(regen.config?.overloads?.find(o=>o.key==='intensive')?.overrides?.healing_dice_count===2,'Regeneração intensiva precisa curar 2d6.');
-assert(ataque.config?.target_relation==='enemy' && ataque.config?.requires_attack===true,'Ataque Temporal precisa ser uma habilidade ofensiva separada.');
+assert(ataque.config?.target_relation==='other' && ataque.config?.requires_attack===true,'Ataque Temporal precisa ser ofensivo e aceitar qualquer outro alvo válido.');
 const enemyMode=interrupcao.config?.modes?.find(m=>m.key==='enemy');
 const allyMode=interrupcao.config?.modes?.find(m=>m.key==='ally');
 assert(enemyMode?.contest && enemyMode?.once_per_combat_per_target===true,'Interrupção contra inimigo precisa usar teste resistido e limite por alvo.');
@@ -45,7 +45,7 @@ const invocar=find(kotone.abilities,'Invocar Orfeu');
 assert(orfeu,'Orfeu precisa existir como ficha filha.');
 assert(['Agi','Dia','Pancada','Tarukaja'].every(n=>find(orfeu.abilities,n)), 'As quatro técnicas de Orfeu precisam morar na ficha filha.');
 assert(invocar?.config?.special_action==='activate_summon' && invocar?.config?.target_mode==='self','Invocar Orfeu precisa ativar a ficha filha sem escolher alvo.');
-assert(find(orfeu.abilities,'Agi')?.config?.target_relation==='enemy','Agi só deve mostrar inimigos.');
+assert(find(orfeu.abilities,'Agi')?.config?.target_relation==='other','Agi precisa poder mirar qualquer outro participante liberado pelo Mestre.');
 assert(find(orfeu.abilities,'Dia')?.config?.target_relation==='ally_or_self','Dia precisa permitir Kotone ou aliado.');
 const taru=find(orfeu.abilities,'Tarukaja');
 assert(taru?.config?.combat_effect?.data?.bonus_damage_die===4 && taru?.config?.combat_effect?.data?.reset_uses===1,'Tarukaja precisa dar +1d4 no primeiro acerto de cada turno durante o buff.');
@@ -76,4 +76,4 @@ assert(fluxo?.config?.combat_effect?.data?.skill_modifiers?.reflexes===2 && flux
 assert((jin.equipment||[]).some(x=>x.name==='Uniforme Okkotsu'),'Uniforme Okkotsu precisa estar no pacote do Jin.');
 assert(jin.cursed_body?.name==='Circuito Hemático' && jin.cursed_body?.is_released===false && jin.cursed_body?.seed_only===true,'Circuito Hemático precisa existir oculto, preservando decisões futuras do Mestre.');
 
-console.log('OK: Aiko, Kotone e Jin preservam suas mecânicas canônicas dentro do motor estruturado v0.8.');
+console.log('OK: Aiko, Kotone e Jin preservam suas mecânicas canônicas dentro do motor estruturado v0.8.1.');
