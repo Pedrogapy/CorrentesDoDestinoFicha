@@ -7,7 +7,7 @@
     "grade": "Grau 4",
     "level": 5,
     "technique_name": "Persona",
-    "technique_description": "Kotone materializa Personas através de sua Técnica. Apenas uma Persona pode permanecer manifestada por vez. Cada Persona possui uma ficha filha e seu próprio conjunto de habilidades; essas habilidades ficam travadas no combate até a Persona correspondente ser invocada. A Persona atual de Kotone é Orfeu.",
+    "technique_description": "Kotone materializa Personas e usa a Persona ativa como projetor de suas técnicas. Apenas uma Persona pode permanecer manifestada por vez. Cada Persona possui uma ficha filha que guarda seu repertório; as habilidades dessa ficha ficam travadas até a Persona correspondente ser manifestada.",
     "notes": "Kotone usa lança e a Técnica Persona. Orfeu possui ficha filha. A invocação não recebe turno separado: ela manifesta o conjunto de técnicas que Kotone passa a poder usar enquanto Orfeu estiver ativo. Treinos: Guarda de Alcance I e Teoria de Manifestação I.",
     "attributes": {
       "strength": 1,
@@ -64,7 +64,7 @@
     {
       "category": "manifestation",
       "name": "Invocar Orfeu",
-      "description": "Kotone manifesta Orfeu e estabelece a conexão necessária para acessar o conjunto de habilidades dessa Persona.",
+      "description": "Kotone chama Orfeu e estabelece a manifestação que permite projetar as técnicas desta Persona.",
       "mechanics": "Custo: 1 PA. Alvo: a própria Kotone. Apenas uma Persona pode ficar ativa por vez. Ao invocar Orfeu, as habilidades da ficha filha Orfeu são desbloqueadas no painel de combate. Dispensar a Persona não custa PA.",
       "config": {
         "pa_cost": 1,
@@ -76,7 +76,8 @@
         "requires_attack": false,
         "uses_cursed_energy": false,
         "special_action": "activate_summon",
-        "summon_key": "orpheus"
+        "summon_key": "orpheus",
+        "target_relation": "self"
       },
       "vp_estimated": 5,
       "vp_approved": 5,
@@ -85,29 +86,93 @@
     {
       "category": "general",
       "name": "Guarda de Alcance I",
-      "description": "Treino de lança voltado a controlar a distância e impedir que um oponente entre livremente na zona de combate de Kotone.",
-      "mechanics": "1 vez por combate, quando um inimigo tentar se aproximar de Kotone enquanto ela estiver usando sua lança, Kotone pode receber +1 no teste apropriado de Reflexos, Lutar ou em um Contra-Ataque feito para manter distância, aparar ou impedir a aproximação. Não aumenta dano.",
+      "description": "Treino com lança para reagir quando um adversário tenta romper a distância que Kotone está controlando.",
+      "mechanics": "REAÇÃO, 0 PA e 0 EA, 1 vez por combate no total. Gatilho narrativo: um inimigo tenta se aproximar enquanto Kotone está usando a lança. Escolha uma resposta: REFLEXOS (+1 no próximo teste de Esquiva/Reflexos pertinente), LUTAR (+1 no próximo ataque com Lutar usado para aparar/manter distância) ou CONTRA-ATAQUE (+1 no próximo contra-ataque). O bônus não aumenta dano.",
       "config": {
         "pa_cost": 0,
         "ea_cost": 0,
-        "damage_die": 0,
-        "damage_dice_count": 0,
         "range": "self",
         "targets": "self",
+        "target_mode": "self",
+        "target_relation": "self",
         "duration": "instant",
-        "condition_severity": "none",
-        "condition_key": null,
-        "once_per_combat": true,
-        "once_per_mission": false,
-        "requires_preparation": false,
-        "meaningful_drawback": false,
         "requires_attack": false,
-        "attack_attribute_key": "dexterity",
-        "attack_skill_key": "reflexes",
-        "damage_flat_attribute_key": null,
         "uses_cursed_energy": false,
-        "forced_critical": false,
-        "critical_threshold": 20
+        "is_reaction": true,
+        "activation_timing": "reaction",
+        "once_per_combat": true,
+        "usage_scope": "source",
+        "modes": [
+          {
+            "key": "reflex",
+            "label": "Reflexos +1",
+            "pa_cost": 0,
+            "ea_cost": 0,
+            "is_reaction": true,
+            "once_per_combat": true,
+            "usage_scope": "source",
+            "target_mode": "self",
+            "target_relation": "self",
+            "combat_effect": {
+              "key": "guard_range_reflex",
+              "name": "Guarda de Alcance — Reflexos",
+              "uses": 1,
+              "data": {
+                "skill_modifiers": {
+                  "reflexes": 1
+                },
+                "remove_when_empty": true
+              }
+            }
+          },
+          {
+            "key": "fight",
+            "label": "Lutar +1",
+            "pa_cost": 0,
+            "ea_cost": 0,
+            "is_reaction": true,
+            "once_per_combat": true,
+            "usage_scope": "source",
+            "target_mode": "self",
+            "target_relation": "self",
+            "combat_effect": {
+              "key": "guard_range_fight",
+              "name": "Guarda de Alcance — Lutar",
+              "uses": 1,
+              "data": {
+                "conditional_attack_bonus": 1,
+                "allowed_attack_skill": "fight",
+                "exclude_source_types": [
+                  "counterattack"
+                ],
+                "remove_when_empty": true
+              }
+            }
+          },
+          {
+            "key": "counter",
+            "label": "Contra-Ataque +1",
+            "pa_cost": 0,
+            "ea_cost": 0,
+            "is_reaction": true,
+            "once_per_combat": true,
+            "usage_scope": "source",
+            "target_mode": "self",
+            "target_relation": "self",
+            "combat_effect": {
+              "key": "guard_range_counter",
+              "name": "Guarda de Alcance — Contra-Ataque",
+              "uses": 1,
+              "data": {
+                "conditional_attack_bonus": 1,
+                "allowed_source_types": [
+                  "counterattack"
+                ],
+                "remove_when_empty": true
+              }
+            }
+          }
+        ]
       },
       "vp_estimated": 2,
       "vp_approved": 2,
@@ -116,8 +181,8 @@
     {
       "category": "general",
       "name": "Teoria de Manifestação I",
-      "description": "Kotone aprendeu a observar manifestações espirituais como sistemas: como se sustentam, o que fazem e onde podem falhar.",
-      "mechanics": "1 vez por missão, ao observar uma invocação, shikigami, familiar, Persona ou manifestação semelhante, Kotone recebe +1 em um teste de Ocultismo ou Percepção apropriado para compreender como a manifestação se mantém ativa, sua função, dependência do usuário, fraqueza estrutural ou possibilidade de interrupção. Não permite controlar shikigamis nem copiar técnicas.",
+      "description": "Kotone analisa manifestações como estruturas de energia: sustentação, função, dependência e pontos de interrupção.",
+      "mechanics": "FORA DO COMBATE AUTOMATIZADO. 1 vez por missão, ao observar uma invocação, shikigami, familiar, Persona ou manifestação semelhante, recebe +1 em um teste apropriado de Ocultismo ou Percepção para entender sustentação, função, dependência do usuário, fraqueza estrutural ou possibilidade de interrupção. Não permite controlar nem copiar a técnica observada.",
       "config": {
         "pa_cost": 0,
         "ea_cost": 0,
@@ -138,7 +203,9 @@
         "damage_flat_attribute_key": null,
         "uses_cursed_energy": false,
         "forced_critical": false,
-        "critical_threshold": 20
+        "critical_threshold": 20,
+        "combat_usable": false,
+        "target_relation": "any"
       },
       "vp_estimated": 1,
       "vp_approved": 1,
@@ -213,7 +280,7 @@
         {
           "category": "technique",
           "name": "Agi",
-          "description": "Orfeu projeta fogo amaldiçoado contra um alvo.",
+          "description": "Orfeu projeta uma chama espiritual contra um inimigo enquanto permanece manifestado.",
           "mechanics": "Disponível somente enquanto Orfeu estiver manifestado. 1 PA + 3 EA. Controle Amaldiçoado + Canalização. Alcance Perto. Dano 1d6 + Mod. Controle Amaldiçoado.",
           "config": {
             "pa_cost": 1,
@@ -226,7 +293,8 @@
             "attack_skill_key": "channeling",
             "damage_dice_count": 1,
             "damage_die": 6,
-            "damage_flat_attribute_key": "cursed_control"
+            "damage_flat_attribute_key": "cursed_control",
+            "target_relation": "enemy"
           },
           "vp_estimated": 2,
           "vp_approved": 2,
@@ -235,7 +303,7 @@
         {
           "category": "technique",
           "name": "Dia",
-          "description": "Orfeu restaura a vitalidade de Kotone ou de um aliado.",
+          "description": "Orfeu canaliza recuperação sobre Kotone ou um aliado.",
           "mechanics": "Disponível somente enquanto Orfeu estiver manifestado. 1 PA + 4 EA. Alvo Perto. Cura 1d6 + Mod. Controle Amaldiçoado de PS.",
           "config": {
             "pa_cost": 1,
@@ -246,7 +314,8 @@
             "uses_cursed_energy": true,
             "healing_dice_count": 1,
             "healing_die": 6,
-            "healing_flat_attribute_key": "cursed_control"
+            "healing_flat_attribute_key": "cursed_control",
+            "target_relation": "ally_or_self"
           },
           "vp_estimated": 3,
           "vp_approved": 3,
@@ -255,7 +324,7 @@
         {
           "category": "technique",
           "name": "Pancada",
-          "description": "Orfeu concentra força espiritual num impacto direto contra o alvo.",
+          "description": "Orfeu comprime força espiritual num impacto direto contra um inimigo.",
           "mechanics": "Disponível somente enquanto Orfeu estiver manifestado. 1 PA + 2 EA. Controle Amaldiçoado + Canalização. Alcance Perto. Dano 1d6 + Mod. Controle Amaldiçoado.",
           "config": {
             "pa_cost": 1,
@@ -268,7 +337,8 @@
             "attack_skill_key": "channeling",
             "damage_dice_count": 1,
             "damage_die": 6,
-            "damage_flat_attribute_key": "cursed_control"
+            "damage_flat_attribute_key": "cursed_control",
+            "target_relation": "enemy"
           },
           "vp_estimated": 2,
           "vp_approved": 2,
@@ -277,7 +347,7 @@
         {
           "category": "technique",
           "name": "Tarukaja",
-          "description": "Orfeu fortalece temporariamente a potência ofensiva de Kotone ou de um aliado.",
+          "description": "Orfeu fortalece temporariamente a capacidade ofensiva de Kotone ou de um aliado.",
           "mechanics": "Disponível somente enquanto Orfeu estiver manifestado. 1 PA + 5 EA. Alvo Perto. Por 2 turnos do alvo, o primeiro ataque que acertar em cada turno causa +1d4 de dano. Não acumula consigo mesmo; reaplicar apenas renova o efeito.",
           "config": {
             "pa_cost": 1,
@@ -298,7 +368,8 @@
                 "remove_when_empty": false,
                 "decrement_on": "target_end"
               }
-            }
+            },
+            "target_relation": "ally_or_self"
           },
           "vp_estimated": 3,
           "vp_approved": 3,
@@ -364,7 +435,7 @@
           "name": "Véu da Fortuna",
           "type": "reaction",
           "description": "A probabilidade se desvia no instante em que um golpe encontra Kotone.",
-          "mechanics": "1 vez por combate, quando Kotone for acertada por um ataque, faz o atacante rerrolar o teste de acerto e manter o segundo resultado.",
+          "mechanics": "REAÇÃO, 0 PA e 0 EA, 1 vez por combate. Quando um ataque acaba de superar a CA de Kotone e ainda aguarda resolução, ela obriga o atacante a rerrolar o d20. O novo resultado substitui o anterior e deve ser mantido, mesmo se continuar acertando.",
           "vp": 2,
           "config": {
             "pa_cost": 0,
@@ -385,7 +456,12 @@
             "once_per_mission": false,
             "requires_preparation": false,
             "meaningful_drawback": false,
-            "charges_cost": 0
+            "charges_cost": 0,
+            "is_reaction": true,
+            "activation_timing": "reaction",
+            "target_mode": "self",
+            "target_relation": "self",
+            "special_action": "reroll_recent_attack_against_self"
           }
         }
       ],

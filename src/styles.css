@@ -288,3 +288,78 @@ label { display:grid; gap:6px; font-size:.83rem; font-weight:750; color:#c8c4cc;
 select[multiple]{
   min-height:78px;
 }
+
+/* ============================================================
+   Motor de Habilidades Estruturadas v0.8.0
+   ============================================================ */
+.advanced-builder {
+  border:1px solid #383842;
+  background:#0e0e12;
+  padding:0;
+  overflow:hidden;
+}
+.advanced-builder > summary {
+  cursor:pointer;
+  list-style:none;
+  padding:11px 12px;
+  font-weight:900;
+  color:#dedbe3;
+  background:#15151a;
+  border-left:3px solid #5e5e68;
+}
+.advanced-builder > summary::-webkit-details-marker { display:none; }
+.advanced-builder > summary::after {
+  content:'+';
+  float:right;
+  color:var(--accent);
+  font-size:1.05rem;
+}
+.advanced-builder[open] > summary::after { content:'−'; }
+.advanced-builder[open] { padding-bottom:12px; }
+.advanced-builder[open] > summary { margin-bottom:12px; border-left-color:var(--accent); }
+.advanced-builder > :not(summary) { margin-left:12px; margin-right:12px; }
+
+.ability-structured-summary {
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px 12px;
+  margin-top:9px;
+  padding:9px 10px;
+  background:#0c0c10;
+  border:1px solid #33333b;
+  border-left:3px solid var(--accent);
+  color:#d8d5dc;
+  font-size:.78rem;
+  line-height:1.35;
+}
+.ability-structured-summary span { white-space:normal; }
+.ability-rules-details {
+  margin-top:8px;
+  border-top:1px dashed rgba(255,255,255,.13);
+  padding-top:7px;
+}
+.ability-rules-details > summary {
+  cursor:pointer;
+  color:#b8b5be;
+  font-weight:800;
+  font-size:.78rem;
+}
+.ability-secondary-target {
+  padding:10px;
+  border:1px solid #80404a;
+  background:rgba(184,31,45,.08);
+}
+.combat-side-field { min-width:145px; }
+.combat-side-field select { min-width:130px; padding:6px 8px; }
+.ability-builder-note {
+  border-color:#394f66;
+  background:#101821;
+  color:#b9d5ec;
+}
+
+@media (max-width:720px) {
+  .ability-structured-summary { display:grid; grid-template-columns:1fr; }
+  .advanced-builder > :not(summary) { margin-left:8px; margin-right:8px; }
+  .combat-side-field { width:100%; }
+  .combat-side-field select { width:100%; }
+}

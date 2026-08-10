@@ -9,7 +9,7 @@
  * - Não expor sistemas narrativamente secretos em telas de jogador apenas por estarem implementados no banco.
  */
 
-export const SYSTEM_VERSION = '0.7.4';
+export const SYSTEM_VERSION = '0.8.0';
 
 export const ATTRIBUTES = [
   {
@@ -134,6 +134,17 @@ export const ENTITY_TYPES = [
 ];
 
 export const GRADE_OPTIONS = ['Sem Grau', 'Grau 4', 'Grau 3', 'Grau 2', 'Grau 1', 'Grau Especial'];
+
+
+// Relações de alvo usadas pelo construtor e pelo combate. A relação é avaliada
+// contra o lado do participante no encontro, não apenas pelo tipo da ficha.
+export const TARGET_RELATIONS = [
+  { key: 'any', name: 'Qualquer participante' },
+  { key: 'enemy', name: 'Inimigo' },
+  { key: 'ally', name: 'Aliado (exceto o usuário)' },
+  { key: 'ally_or_self', name: 'Aliado ou o próprio usuário' },
+  { key: 'self', name: 'Somente o próprio usuário' },
+];
 
 
 // ============================================================
@@ -562,10 +573,24 @@ export function estimateAbilityVP(config = {}) {
 
   if (config.no_attack_or_save) vp += 2;
   if (config.mobility) vp += 1;
-  if (config.healing) vp += 2;
+  if (config.healing || (Number(config.healing_dice_count || 0) > 0 && Number(config.healing_die || 0) > 0)) vp += 2;
   if (config.damage_reduction) vp += 1;
   if (config.resource_generation) vp += 2;
   if (config.summon_sheet) vp += 2;
+
+  // Efeitos estruturados do motor v0.8 também entram na estimativa. O valor
+  // continua sendo uma triagem; combinações incomuns ainda podem ser ajustadas
+  // pelo Mestre na aprovação.
+  const effect = config.combat_effect?.data || {};
+  if (Number(effect.ca_bonus || 0) > 0) vp += Math.max(1, Math.ceil(Number(effect.ca_bonus) / 2));
+  if (Number(effect.attack_bonus || 0) > 0 || Number(effect.conditional_attack_bonus || 0) > 0) vp += 1;
+  if (Number(effect.bonus_damage_dice_count || 0) > 0 && Number(effect.bonus_damage_die || 0) > 0) vp += 1;
+  if (Number(effect.damage_reduction_dice_count || 0) > 0 || Number(effect.damage_reduction_flat || 0) > 0) vp += 1;
+  if (Number(effect.pa_penalty_next_turn || 0) > 0) vp += 1;
+  if (effect.blocks_actions || effect.blocks_reactions) vp += 2;
+  if (effect.immune_to_damage || effect.immune_to_external_changes) vp += 2;
+  if (config.contest && typeof config.contest === 'object') vp += 1;
+  if (Array.isArray(config.overloads) && config.overloads.length) vp += 1;
 
   const paCost = clamp(config.pa_cost || 1, 0, 7);
   const eaCost = clamp(config.ea_cost || 0, 0, 100);

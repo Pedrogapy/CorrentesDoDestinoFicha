@@ -7,8 +7,8 @@
     "grade": "Grau 4",
     "level": 5,
     "technique_name": "Pincel Mágico",
-    "technique_description": "Antonio alterna entre a manifestação de um Pincel Mágico, usado para impor pinturas sobre a realidade, e um estilo marcial de curta distância. O Pincel libera técnicas de pintura; a Postura de Luta libera seu repertório de golpes flamejantes. Os dois estilos são mutuamente exclusivos durante o combate e podem ser escolhidos no início do próprio turno.",
-    "notes": "Estilo de Combate Híbrido. No combate, escolha Pincel Mágico ou Postura de Luta no início do turno. As habilidades incompatíveis ficam travadas automaticamente. O Ritmo Híbrido recompensa uma única transição bem preparada por combate.",
+    "technique_description": "Antônio alterna entre dois estilos de combate que usam repertórios diferentes. Com o Pincel Mágico manifestado, ele projeta pinturas sobre a realidade. Na Postura de Luta, usa um repertório marcial de golpes flamejantes. A escolha ou troca é feita no início do próprio turno, antes de outra ação, e o painel trava automaticamente o repertório incompatível.",
+    "notes": "Estilo de combate híbrido, não classe e não Técnica do Corpo. O Ritmo Híbrido premia uma transição preparada entre os dois estilos uma única vez por combate.",
     "attributes": {
       "strength": 4,
       "dexterity": 3,
@@ -64,7 +64,7 @@
     {
       "category": "technique",
       "name": "Invocar Pincel Mágico",
-      "description": "Antonio manifesta o Pincel Mágico e muda seu foco para a criação de efeitos por pintura.",
+      "description": "Antônio manifesta o Pincel Mágico e passa a usar o repertório de pinturas até trocar de estilo em outro início de turno.",
       "mechanics": "ESTILO DE COMBATE. No início do próprio turno, antes de realizar outra ação, Antonio pode invocar o Pincel Mágico sem gastar PA ou EA. Enquanto o Pincel estiver ativo, as técnicas de pintura ficam liberadas e os golpes da Postura de Luta ficam travados. A primeira técnica de pintura usada a partir do início de cada turno custa 1 EA a menos, mínimo de 1 EA. Trocar de Postura de Luta para Pincel após ter acertado corpo a corpo no turno anterior pode ativar uma única vez por combate o Ritmo Híbrido: a próxima técnica de pintura que causar dano recebe +1 de dano.",
       "config": {
         "pa_cost": 0,
@@ -89,7 +89,8 @@
         "critical_threshold": 20,
         "target_mode": "self",
         "special_action": "set_combat_mode",
-        "combat_mode_key": "magic_brush"
+        "combat_mode_key": "magic_brush",
+        "target_relation": "self"
       },
       "vp_estimated": 1,
       "vp_approved": 1,
@@ -98,8 +99,8 @@
     {
       "category": "technique",
       "name": "A Linha Que Separa",
-      "description": "Antonio traça uma linha no ar e o desenho se converte em um corte projetado sobre o alvo.",
-      "mechanics": "Requer Pincel Mágico. Custo: 1 PA e 2 EA. Ataque de Controle Amaldiçoado + Canalização. Dano: 1d6 + Mod. Controle Amaldiçoado. SOBRECARGA: +3 EA permite escolher um segundo alvo que esteja próximo ou alinhado ao primeiro pela visão de Antonio. O segundo alvo recebe um segundo teste de ataque e, caso atingido, sofre metade do dano final.",
+      "description": "Antônio traça uma linha no ar com o Pincel e a pintura se converte num corte que atravessa o alvo seguindo a perspectiva do desenho.",
+      "mechanics": "Requer Pincel Mágico. 1 PA + 2 EA. Alvo: 1 inimigo Perto. Controle Amaldiçoado + Canalização. Dano: 1d6 + Mod. Controle Amaldiçoado. SOBRECARGA (+3 EA): escolha também um SEGUNDO ALVO diferente, próximo ou alinhado ao primeiro na perspectiva de Antônio. O segundo alvo recebe uma rolagem de ataque própria; se acertado, somente os DADOS de dano são reduzidos à metade (arredondado para baixo), mantendo o modificador normalmente.",
       "config": {
         "pa_cost": 1,
         "ea_cost": 2,
@@ -132,10 +133,14 @@
             "extra_ea": 3,
             "overrides": {
               "requires_secondary_target": true,
-              "secondary_target_damage_factor": 0.5
+              "secondary_target_relation": "enemy",
+              "secondary_target_die_factor": 0.5,
+              "secondary_target_flat_factor": 1,
+              "secondary_target_damage_factor": 1
             }
           }
-        ]
+        ],
+        "target_relation": "enemy"
       },
       "vp_estimated": 3,
       "vp_approved": 3,
@@ -144,8 +149,8 @@
     {
       "category": "technique",
       "name": "Explosão Artística",
-      "description": "Antonio pinta uma bomba no chão e deixa o desenho carregado para explodir no fim da rodada.",
-      "mechanics": "Requer Pincel Mágico. Custo: 1 PA e 7 EA. Escolha no site as criaturas dentro da área quando a bomba for preparada. Só pode existir 1 Explosão Artística preparada por vez. No fim da rodada, Antonio ou o Mestre usa “Detonar no fim da rodada”. A explosão causa 1d8 + 2 + Mod. Controle Amaldiçoado. Cada alvo testa Destreza + Reflexos contra CD 8 + Controle Amaldiçoado + Canalização de Antonio; sucesso reduz o dano pela metade.",
+      "description": "Antônio pinta uma bomba no cenário. A imagem permanece armada até ser detonada ao fim da rodada da mesa.",
+      "mechanics": "Requer Pincel Mágico. 1 PA + 7 EA. Selecione os inimigos que estão dentro da área quando a bomba é preparada. Apenas uma bomba pode ficar ativa. Ao detonar: 1d8 + 2 + Mod. Controle Amaldiçoado de dano; cada alvo rola Destreza + Reflexos contra CD 8 + Controle Amaldiçoado + Canalização de Antônio para receber metade.",
       "config": {
         "pa_cost": 1,
         "ea_cost": 7,
@@ -176,7 +181,8 @@
         "bomb_damage_dice_count": 1,
         "bomb_damage_die": 8,
         "bomb_flat_bonus": 2,
-        "bomb_flat_attribute_key": "cursed_control"
+        "bomb_flat_attribute_key": "cursed_control",
+        "target_relation": "enemy"
       },
       "vp_estimated": 4,
       "vp_approved": 4,
@@ -185,8 +191,8 @@
     {
       "category": "technique",
       "name": "Eu Pintei Eles Queimando",
-      "description": "Antonio pinta o alvo em combustão e faz a imagem se impor sobre ele como chamas reais.",
-      "mechanics": "Requer Pincel Mágico. Custo: 1 PA e 3 EA. Ataque de Controle Amaldiçoado + Canalização. Dano inicial: 1d6 + Mod. Controle Amaldiçoado. Em Chamas por 2 turnos: no início de cada turno do alvo, sofre 1d4 de dano. O alvo pode gastar 1 PA no próprio turno para apagar. Usar novamente em alguém que já está Em Chamas apenas renova a duração; não reaplica o dano inicial e não acumula o efeito.",
+      "description": "Antônio pinta o alvo envolto em chamas e força a imagem a se impor sobre a realidade.",
+      "mechanics": "Requer Pincel Mágico. 1 PA + 3 EA. Alvo: 1 inimigo Perto. Controle Amaldiçoado + Canalização. Dano inicial: 1d6 + Mod. Controle Amaldiçoado. Aplica Em Chamas por 2 turnos, causando 1d4 no início do turno. O alvo pode gastar 1 PA no próprio turno para apagar. Reaplicar em alvo já em chamas apenas renova a duração: não causa novamente o dano inicial e não acumula.",
       "config": {
         "pa_cost": 1,
         "ea_cost": 3,
@@ -221,7 +227,8 @@
           "start_turn_damage_die": 4,
           "extinguish_pa_cost": 1,
           "refresh_only_if_existing": true
-        }
+        },
+        "target_relation": "enemy"
       },
       "vp_estimated": 4,
       "vp_approved": 4,
@@ -230,8 +237,8 @@
     {
       "category": "technique",
       "name": "As Setas Indicam a Direção",
-      "description": "Antonio pinta linhas-guia que corrigem a trajetória de um golpe que acabou de ser executado.",
-      "mechanics": "REAÇÃO. Requer Pincel Mágico. Custo: 1 PA e 3 EA. Limite: 1 vez por rodada. Depois que um ataque de Antonio ou de um aliado for rolado, selecione o ataque mais recente no painel e conceda +2 ao total de acerto. O segundo valor é o definitivo para verificar se o ataque superou a CA. Não corrige 1 natural.",
+      "description": "Antônio desenha setas-guia sobre a trajetória de uma ação recém-executada, corrigindo sua direção antes que o resultado se fixe.",
+      "mechanics": "Requer Pincel Mágico. REAÇÃO, 1 PA + 3 EA, 1 vez por rodada. Escolha a rolagem de ataque mais recente ainda não resolvida: ela recebe +2 no acerto. Pode apoiar Antônio ou um aliado. Não transforma 1 natural em sucesso.",
       "config": {
         "pa_cost": 1,
         "ea_cost": 3,
@@ -262,7 +269,9 @@
         "is_reaction": true,
         "activation_timing": "reaction",
         "once_per_round": true,
-        "attack_bonus": 2
+        "attack_bonus": 2,
+        "target_relation": "any",
+        "recent_action_actor_relation": "ally_or_self"
       },
       "vp_estimated": 3,
       "vp_approved": 3,
@@ -271,7 +280,7 @@
     {
       "category": "general",
       "name": "Assumir Postura de Luta",
-      "description": "Antonio recolhe o foco de pintura e entra em sua postura marcial, preparando golpes desarmados rápidos e explosivos.",
+      "description": "Antônio abandona a projeção por pintura e assume sua postura marcial, liberando o repertório de golpes flamejantes.",
       "mechanics": "ESTILO DE COMBATE. No início do próprio turno, antes de realizar outra ação, Antonio pode assumir a Postura de Luta sem gastar PA ou EA. Enquanto estiver nela, os golpes do estilo Monge Flamejante ficam liberados e as técnicas do Pincel Mágico ficam travadas. O primeiro ataque corpo a corpo realizado a partir do início de cada turno recebe +1 de dano. Trocar de Pincel para Postura após ter acertado uma técnica de pintura no turno anterior pode ativar uma única vez por combate o Ritmo Híbrido: o próximo ataque corpo a corpo recebe +1 no acerto.",
       "config": {
         "pa_cost": 0,
@@ -296,7 +305,8 @@
         "critical_threshold": 20,
         "target_mode": "self",
         "special_action": "set_combat_mode",
-        "combat_mode_key": "flame_monk"
+        "combat_mode_key": "flame_monk",
+        "target_relation": "self"
       },
       "vp_estimated": 1,
       "vp_approved": 1,
@@ -335,7 +345,8 @@
         "damage_flat_best_of": [
           "strength",
           "cursed_control"
-        ]
+        ],
+        "target_relation": "enemy"
       },
       "vp_estimated": 2,
       "vp_approved": 2,
@@ -415,7 +426,8 @@
               }
             }
           }
-        ]
+        ],
+        "target_relation": "enemy"
       },
       "vp_estimated": 3,
       "vp_approved": 3,
@@ -455,7 +467,8 @@
           "strength",
           "cursed_control"
         ],
-        "prior_turn_same_target_attack_bonus": 1
+        "prior_turn_same_target_attack_bonus": 1,
+        "target_relation": "enemy"
       },
       "vp_estimated": 3,
       "vp_approved": 3,
@@ -504,7 +517,8 @@
           "start_turn_damage_die": 4,
           "extinguish_pa_cost": 1,
           "refresh_only_if_existing": false
-        }
+        },
+        "target_relation": "enemy"
       },
       "vp_estimated": 3,
       "vp_approved": 3,
@@ -556,7 +570,8 @@
             },
             "decrement_on": "target_end"
           }
-        }
+        },
+        "target_relation": "enemy"
       },
       "vp_estimated": 4,
       "vp_approved": 4,

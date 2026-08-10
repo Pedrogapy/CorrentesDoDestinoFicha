@@ -7,8 +7,8 @@
     "grade": "Grau 4",
     "level": 5,
     "technique_name": "Técnica Temporal",
-    "technique_description": "Aiko manipula o fluxo temporal de forma localizada. Sua técnica é voltada a proteção, restauração, ataque e interrupção. Ela pode amortecer impactos, restaurar o estado recente de um corpo, projetar distorções temporais e suspender por instantes o fluxo de um alvo. Aiko não possui Dez Sombras como técnica atual.",
-    "notes": "Papel principal: suporte. Aiko é cega; a cegueira faz parte da personagem e da ficção, mas não ocupa slot de habilidade. Sobrecargas aparecem como opções reais no combate.",
+    "technique_description": "Aiko manipula o fluxo temporal de forma localizada. Ela pode desacelerar impactos, restaurar um corpo a um estado recente, projetar uma distorção temporal ofensiva e interromper por instantes o fluxo de uma criatura. Cada uso é tratado como uma execução própria no combate, com reação, alvo, custo e Sobrecarga quando aplicável.",
+    "notes": "Papel principal: suporte. Aiko é cega; isso pertence à ficção da personagem e não ocupa slot de habilidade. Sobrecargas são escolhas reais no painel e não apenas texto descritivo.",
     "attributes": {
       "strength": 1,
       "dexterity": 1,
@@ -64,8 +64,8 @@
     {
       "category": "technique",
       "name": "Escudo Temporal",
-      "description": "Aiko desacelera o instante de um impacto que atingiria a si mesma ou um aliado, retirando parte da força que chega ao corpo.",
-      "mechanics": "REAÇÃO, inclusive fora do turno de Aiko. Custo: 1 PA e 3 EA. Escolha Aiko ou outro alvo do combate. Até o início do próximo turno de Aiko, o primeiro ataque físico ou projétil que causar dano ao alvo é reduzido em 1d6 + Mod. Controle Amaldiçoado. SOBRECARGA: +2 EA faz o escudo proteger também um segundo impacto na mesma duração.",
+      "description": "Aiko estende uma película de tempo desacelerado sobre si mesma ou sobre um aliado no instante em que o perigo chega.",
+      "mechanics": "REAÇÃO, inclusive fora do turno de Aiko. 1 PA + 3 EA. Alvo: Aiko ou 1 aliado Perto. Até o início do próximo turno de Aiko, o primeiro impacto físico ou projétil que causar dano ao alvo é reduzido em 1d6 + Mod. Controle Amaldiçoado. SOBRECARGA (+2 EA): o efeito possui 2 usos na mesma duração e pode reduzir dois impactos diferentes.",
       "config": {
         "pa_cost": 1,
         "ea_cost": 3,
@@ -91,7 +91,8 @@
             "damage_reduction_die": 6,
             "applies_to": "physical_projectile",
             "expires_on_source_turn_start": true,
-            "remove_when_empty": true
+            "remove_when_empty": true,
+            "immune_to_external_changes": false
           }
         },
         "overloads": [
@@ -103,7 +104,8 @@
               "effect_charges": 2
             }
           }
-        ]
+        ],
+        "target_relation": "ally_or_self"
       },
       "vp_estimated": 3,
       "vp_approved": 3,
@@ -112,8 +114,8 @@
     {
       "category": "technique",
       "name": "Regeneração Temporal",
-      "description": "Aiko aproxima o ferimento de um estado anterior e mais íntegro do corpo.",
-      "mechanics": "Custo normal: 1 PA e 4 EA. Toque. Cura 1d6 + Mod. Controle Amaldiçoado. SOBRECARGA INTENSIVA: +3 EA (7 EA no total) para curar 2d6 + Mod. Controle Amaldiçoado, apropriada para ferimentos graves ou aliados abaixo da metade do PS. Medicina pode ser pedida pelo Mestre quando a situação corporal for especialmente complexa.",
+      "description": "Aiko recua localmente o estado de um ferimento, aproximando o corpo de um momento em que ainda estava íntegro.",
+      "mechanics": "1 PA + 4 EA. Toque. Alvo: Aiko ou 1 aliado. Cura 1d6 + Mod. Controle Amaldiçoado. SOBRECARGA INTENSIVA (+3 EA, 7 EA total): cura 2d6 + Mod. Controle Amaldiçoado. O Mestre pode pedir Medicina quando o ferimento exigir conhecimento corporal além do simples retrocesso temporal.",
       "config": {
         "pa_cost": 1,
         "ea_cost": 4,
@@ -139,7 +141,8 @@
               "healing_dice_count": 2
             }
           }
-        ]
+        ],
+        "target_relation": "ally_or_self"
       },
       "vp_estimated": 3,
       "vp_approved": 3,
@@ -148,8 +151,8 @@
     {
       "category": "technique",
       "name": "Ataque Temporal",
-      "description": "Aiko lança uma distorção temporal concentrada que atravessa o espaço até o alvo e desorganiza seu estado presente.",
-      "mechanics": "Custo: 1 PA e 2 EA. Ataque de Controle Amaldiçoado + Pontaria. Alcance Perto. Dano: 1d6 + Mod. Controle Amaldiçoado. É uma habilidade própria e possui uso independente da Interrupção Temporal.",
+      "description": "Aiko projeta em linha uma distorção que força o estado temporal do alvo a se desalinhar por um instante.",
+      "mechanics": "1 PA + 2 EA. Alvo: 1 inimigo Perto. Teste de Controle Amaldiçoado + Pontaria. Dano: 1d6 + Mod. Controle Amaldiçoado. É uma habilidade ofensiva própria e não compartilha limite com Interrupção Temporal.",
       "config": {
         "pa_cost": 1,
         "ea_cost": 2,
@@ -164,7 +167,8 @@
         "damage_die": 6,
         "damage_flat_attribute_key": "cursed_control",
         "critical_threshold": 20,
-        "forced_critical": false
+        "forced_critical": false,
+        "target_relation": "enemy"
       },
       "vp_estimated": 2,
       "vp_approved": 2,
@@ -173,8 +177,8 @@
     {
       "category": "technique",
       "name": "Interrupção Temporal",
-      "description": "Aiko interrompe o fluxo temporal de uma criatura por um instante. Ela pode usar a mesma extensão de duas formas distintas, cada uma com custo e limite próprios.",
-      "mechanics": "INIMIGO: 1 PA + 6 EA, 1 vez por combate por alvo. Controle Amaldiçoado + Controle de Técnica contra Resistência + Firmeza. Se Aiko vencer, o alvo fica suspenso até o início do próprio turno e começa esse turno com 1 PA a menos. ALIADO: reação, 1 PA + 5 EA, 1 vez por rodada. O alvo fica imóvel e suspenso no tempo até o início do próprio turno; enquanto isso não sofre dano nem condições e não pode agir ou reagir. Os dois modos possuem controles de uso separados.",
+      "description": "Aiko suspende o fluxo temporal de uma criatura. Contra um inimigo, tenta roubar sua janela de ação; em um aliado, transforma um instante em um abrigo temporal.",
+      "mechanics": "INTERROMPER INIMIGO: 1 PA + 6 EA, 1x por combate por alvo. Controle Amaldiçoado + Controle de Técnica contra Resistência + Firmeza. Falha do inimigo: fica suspenso até o início do próprio turno e começa esse turno com -1 PA. Se resistir, não perde PA, mas permanece temporalmente desacelerado até o fim desse turno, com deslocamento narrativo reduzido pela metade. SUSPENDER ALIADO: REAÇÃO, 1 PA + 5 EA, 1x por rodada. Aiko ou 1 aliado fica suspenso até o início do próprio turno: não age/reage e não pode sofrer dano, cura, condições ou outras alterações externas enquanto a suspensão durar.",
       "config": {
         "pa_cost": 1,
         "ea_cost": 6,
@@ -209,6 +213,16 @@
                 "blocks_actions": true,
                 "blocks_reactions": true
               }
+            },
+            "target_relation": "enemy",
+            "contest_resisted_effect": {
+              "key": "temporal_interruption_resisted",
+              "name": "Desaceleração Temporal",
+              "remaining_turns": 1,
+              "data": {
+                "movement_factor": 0.5,
+                "description": "O alvo resistiu à interrupção completa, mas seu deslocamento narrativo fica reduzido pela metade até o fim do próprio turno."
+              }
             }
           },
           {
@@ -228,9 +242,11 @@
                 "remove_on_target_turn_start": true,
                 "immune_to_damage": true,
                 "blocks_actions": true,
-                "blocks_reactions": true
+                "blocks_reactions": true,
+                "immune_to_external_changes": true
               }
-            }
+            },
+            "target_relation": "ally_or_self"
           }
         ]
       },
@@ -266,9 +282,9 @@
         {
           "id": "37e30f2f-a0db-4cfb-98c7-8550a335aaf1",
           "name": "Costura do Acaso",
-          "type": "passive",
-          "description": "Uma pequena falha do destino pode ser recosturada antes de se fixar.",
-          "mechanics": "1 vez por rodada, quando Aiko obtiver 1 natural em um teste, pode rerrolar. O segundo resultado deve ser mantido.",
+          "type": "reaction",
+          "description": "Quando um pequeno erro de destino se fixa em Aiko, a costura amaldiçoada puxa o instante de volta e exige uma nova rolagem.",
+          "mechanics": "REAÇÃO, 0 PA e 0 EA. 1 vez por rodada, imediatamente depois de Aiko obter 1 natural em uma rolagem própria elegível, ela pode rerrolar o d20. O segundo resultado é obrigatório.",
           "vp": 2,
           "config": {
             "pa_cost": 0,
@@ -290,7 +306,12 @@
             "requires_preparation": false,
             "meaningful_drawback": false,
             "charges_cost": 0,
-            "once_per_round": true
+            "once_per_round": true,
+            "is_reaction": true,
+            "activation_timing": "reaction",
+            "target_mode": "self",
+            "target_relation": "self",
+            "special_action": "reroll_recent_natural_one"
           }
         }
       ],

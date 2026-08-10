@@ -24,7 +24,7 @@ import {
   estimateAbilityVP,
   SYSTEM_VERSION,
 } from './lib/system.js';
-import { renderTestsPage, quickSkillRoll, renderPlayerCombatPageV2, renderMasterCombatPageV2, abilityCombatConfigFields } from './lib/combat-ui.js';
+import { renderTestsPage, quickSkillRoll, renderPlayerCombatPageV2, renderMasterCombatPageV2, abilityCombatConfigFields, abilityConfigFromForm } from './lib/combat-ui.js';
 import { renderPlayerEquipmentPage, renderMasterEquipmentManager, pendingEquipmentQueueHtml, bindPendingEquipmentQueue } from './lib/equipment-ui.js';
 
 const app = document.querySelector('#app');
@@ -571,8 +571,9 @@ async function renderAbilitiesPage() {
         <form id="ability-form" class="grid">
           <label>Categoria<select name="category">${ABILITY_CATEGORIES.map(c=>`<option value="${c.key}">${c.name}</option>`).join('')}</select></label>
           <label>Nome<input name="name" required /></label>
-          <label>Descrição narrativa<textarea name="description"></textarea></label>
-          <label>Mecânica<textarea name="mechanics" placeholder="Efeito, teste, duração, limitações..."></textarea></label>
+          <label>Descrição narrativa<textarea name="description" placeholder="Explique o que a habilidade faz no mundo e como ela se manifesta."></textarea></label>
+          <label>Mecânica<textarea name="mechanics" placeholder="Explique regras especiais, gatilhos e exceções em linguagem humana. Os campos estruturados abaixo executam a automação no combate."></textarea></label>
+          <div class="notice ability-builder-note"><strong>Como montar:</strong> a Descrição e a Mecânica documentam a habilidade para a mesa. PA, EA, alvos, ataque, cura, resistência, efeitos e Sobrecarga abaixo viram regras executáveis no painel de combate. Não é necessário repetir todos os números no texto.</div>
           <div class="field-row-3">
             <label>PA<input name="pa" type="number" min="0" max="7" value="1" /></label>
             <label>EA<input name="ea" type="number" min="0" value="3" /></label>
@@ -582,7 +583,7 @@ async function renderAbilitiesPage() {
           <div class="field-row"><label>Duração<select name="duration">${Object.entries(VP_OPTIONS.duration).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')}</select></label><label>Severidade da condição<select name="condition">${Object.entries(VP_OPTIONS.conditionSeverity).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')}</select></label></div><label>Condição aplicada<select name="conditionKey"><option value="">Nenhuma / efeito próprio</option>${state.conditions.map(c=>`<option value="${c.key}">${esc(c.name)}</option>`).join('')}</select></label>
           <div class="field-row"><label><input name="onceCombat" type="checkbox" style="width:auto" /> 1 vez por combate</label><label><input name="onceMission" type="checkbox" style="width:auto" /> 1 vez por missão</label></div>
           <div class="field-row"><label><input name="preparation" type="checkbox" style="width:auto" /> Exige preparação</label><label><input name="drawback" type="checkbox" style="width:auto" /> Desvantagem relevante</label></div>
-          ${abilityCombatConfigFields()}
+          ${abilityCombatConfigFields(state.character?.special_resources||[])}
           <div class="notice" id="vp-preview">VP estimado: 1</div>
           <button class="btn primary">Enviar para aprovação</button>
         </form>
@@ -601,13 +602,7 @@ async function renderAbilitiesPage() {
     ${state.summonSelected?`<div style="height:14px"></div><section class="card"><div class="btn-row"><h2 style="margin:0">Habilidades de ${esc(getName(state.summonSelected))}</h2><span class="pill">Ficha filha</span></div><div class="notice" style="margin-top:8px">Estas habilidades pertencem à invocação e podem ser travadas no combate até a manifestação correspondente estar ativa.</div><div class="list" style="margin-top:10px">${(childAbilityMap[state.summonSelected.id]||[]).length?(childAbilityMap[state.summonSelected.id]||[]).map(a=>abilityCard(a)).join(''):'<p class="muted">Nenhuma habilidade cadastrada nesta ficha filha.</p>'}</div></section><div style="height:14px"></div><section id="summon-editor"></section>`:''}`;
 
   const form=root.querySelector('#ability-form');
-  const getConfig=()=>{
-    const f=new FormData(form);
-    return {
-      pa_cost:Number(f.get('pa')||0), ea_cost:Number(f.get('ea')||0), damage_die:Number(f.get('die')||0), damage_dice_count:Number(f.get('diceCount')||0),
-      range:f.get('range'), targets:f.get('targets'), duration:f.get('duration'), condition_severity:f.get('condition'), condition_key:f.get('conditionKey')||null, once_per_combat:f.get('onceCombat')==='on', once_per_mission:f.get('onceMission')==='on', requires_preparation:f.get('preparation')==='on', meaningful_drawback:f.get('drawback')==='on', requires_attack:f.get('requiresAttack')==='on', is_reaction:f.get('isReaction')==='on', attack_attribute_key:f.get('attackAttribute'), attack_skill_key:f.get('attackSkill'), damage_flat_attribute_key:f.get('damageFlatAttribute')||null, uses_cursed_energy:f.get('usesCursedEnergy')==='on', forced_critical:f.get('forcedCritical')==='on', critical_threshold:Number(f.get('criticalThreshold')||20),
-    };
-  };
+  const getConfig=()=>abilityConfigFromForm(form);
   const updateVp=()=>root.querySelector('#vp-preview').textContent=`VP estimado: ${estimateAbilityVP(getConfig())}`;
   form.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',updateVp));
   updateVp();
@@ -775,15 +770,16 @@ async function renderMasterSecret(root,character){
           <h3>Nova habilidade do Corpo</h3>
           <label>Categoria<select name="category">${ABILITY_CATEGORIES.filter(c=>c.key!=='domain').map(c=>`<option value="${c.key}">${c.name}</option>`).join('')}</select></label>
           <label>Nome<input name="name" required /></label>
-          <label>Descrição<textarea name="description"></textarea></label>
-          <label>Mecânica<textarea name="mechanics"></textarea></label>
+          <label>Descrição<textarea name="description" placeholder="O que a habilidade representa e faz na ficção."></textarea></label>
+          <label>Mecânica<textarea name="mechanics" placeholder="Gatilhos, exceções e regras especiais. A automação vem dos campos estruturados abaixo."></textarea></label>
+          <div class="notice ability-builder-note"><strong>Motor estruturado:</strong> use os campos de combate para dizer ao sistema o que deve ser calculado automaticamente. O texto continua sendo a referência humana para regras excepcionais.</div>
           <div class="field-row-3"><label>PA<input name="pa" type="number" min="0" max="7" value="1" /></label><label>EA<input name="ea" type="number" min="0" value="2" /></label><label>Dado<select name="die"><option value="0">Sem dano</option>${[4,6,8,10,12,20].map(v=>`<option value="${v}">d${v}</option>`).join('')}</select></label></div>
           <div class="field-row-3"><label>Qtd. dados<input name="diceCount" type="number" min="0" max="12" value="0" /></label><label>Alcance<select name="range">${Object.entries(VP_OPTIONS.range).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')}</select></label><label>Alvos<select name="targets">${Object.entries(VP_OPTIONS.targets).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')}</select></label></div>
           <div class="field-row"><label>Duração<select name="duration">${Object.entries(VP_OPTIONS.duration).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')}</select></label><label>Condição<select name="condition">${Object.entries(VP_OPTIONS.conditionSeverity).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')}</select></label></div>
           <label>Condição do compêndio<select name="conditionKey"><option value="">Nenhuma</option>${state.conditions.map(c=>`<option value="${c.key}">${esc(c.name)}</option>`).join('')}</select></label>
           <div class="field-row"><label><input name="onceCombat" type="checkbox" style="width:auto" /> 1x combate</label><label><input name="onceMission" type="checkbox" style="width:auto" /> 1x missão</label></div>
           <div class="field-row"><label><input name="preparation" type="checkbox" style="width:auto" /> Exige preparação</label><label><input name="drawback" type="checkbox" style="width:auto" /> Desvantagem relevante</label></div>
-          ${abilityCombatConfigFields()}
+          ${abilityCombatConfigFields(character?.special_resources||[])}
           <div class="notice" id="cursed-body-vp-preview">VP de referência: 1</div>
           <label>VP definido pelo Mestre<input name="vpApproved" type="number" min="1" value="1" /></label>
           <button class="btn bad">Adicionar habilidade do Corpo</button>
@@ -803,14 +799,15 @@ async function renderMasterSecret(root,character){
         <form id="master-ability-form" class="card grid">
           <label>Categoria<select name="category">${ABILITY_CATEGORIES.map(c=>`<option value="${c.key}">${c.name}</option>`).join('')}</select></label>
           <label>Nome<input name="name" required /></label>
-          <label>Descrição<textarea name="description"></textarea></label>
-          <label>Mecânica<textarea name="mechanics"></textarea></label>
+          <label>Descrição<textarea name="description" placeholder="O que a habilidade representa e faz na ficção."></textarea></label>
+          <label>Mecânica<textarea name="mechanics" placeholder="Gatilhos, exceções e regras especiais. A automação vem dos campos estruturados abaixo."></textarea></label>
+          <div class="notice ability-builder-note"><strong>Motor estruturado:</strong> use os campos de combate para dizer ao sistema o que deve ser calculado automaticamente. O texto continua sendo a referência humana para regras excepcionais.</div>
           <div class="field-row-3"><label>PA<input name="pa" type="number" min="0" max="7" value="1" /></label><label>EA<input name="ea" type="number" min="0" value="3" /></label><label>Dado<select name="die"><option value="0">Sem dano</option>${[4,6,8,10,12,20].map(v=>`<option value="${v}">d${v}</option>`).join('')}</select></label></div>
           <div class="field-row-3"><label>Qtd. dados<input name="diceCount" type="number" min="0" max="12" value="0" /></label><label>Alcance<select name="range">${Object.entries(VP_OPTIONS.range).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')}</select></label><label>Alvos<select name="targets">${Object.entries(VP_OPTIONS.targets).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')}</select></label></div>
           <div class="field-row"><label>Duração<select name="duration">${Object.entries(VP_OPTIONS.duration).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')}</select></label><label>Condição<select name="condition">${Object.entries(VP_OPTIONS.conditionSeverity).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')}</select></label></div>
           <label>Condição do compêndio<select name="conditionKey"><option value="">Nenhuma</option>${state.conditions.map(c=>`<option value="${c.key}">${esc(c.name)}</option>`).join('')}</select></label>
           <div class="field-row"><label><input name="onceCombat" type="checkbox" style="width:auto" /> 1x combate</label><label><input name="onceMission" type="checkbox" style="width:auto" /> 1x missão</label></div>
-          ${abilityCombatConfigFields()}
+          ${abilityCombatConfigFields(character?.special_resources||[])}
           <div class="notice" id="master-vp-preview">VP estimado: 1</div>
           <label>VP final aprovado<input name="vpApproved" type="number" min="1" value="1" /></label>
           <label><input name="override" type="checkbox" style="width:auto" /> Ignorar limite normal (somente exceção narrativa do mestre)</label>
@@ -829,7 +826,7 @@ async function renderMasterSecret(root,character){
   root.querySelector('#track-form').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);await withBusy(()=>api.upsertMasterProgress({character_id:character.id,key:f.get('key'),title:f.get('title'),current_points:Number(f.get('current')||0),target_points:f.get('target')===''?null:Number(f.get('target')),master_notes:f.get('notes'),reward_notes:f.get('reward')}),'Progresso oculto salvo.');renderMasterSecret(root,character);};
 
   const abilityForm=root.querySelector('#master-ability-form');
-  const configFromMasterAbility=()=>{const f=new FormData(abilityForm);return {pa_cost:Number(f.get('pa')||0),ea_cost:Number(f.get('ea')||0),damage_die:Number(f.get('die')||0),damage_dice_count:Number(f.get('diceCount')||0),range:f.get('range'),targets:f.get('targets'),duration:f.get('duration'),condition_severity:f.get('condition'),condition_key:f.get('conditionKey')||null,once_per_combat:f.get('onceCombat')==='on',once_per_mission:f.get('onceMission')==='on',requires_attack:f.get('requiresAttack')==='on',is_reaction:f.get('isReaction')==='on',attack_attribute_key:f.get('attackAttribute'),attack_skill_key:f.get('attackSkill'),damage_flat_attribute_key:f.get('damageFlatAttribute')||null,uses_cursed_energy:f.get('usesCursedEnergy')==='on',forced_critical:f.get('forcedCritical')==='on',critical_threshold:Number(f.get('criticalThreshold')||20)};};
+  const configFromMasterAbility=()=>abilityConfigFromForm(abilityForm);
   const updateMasterVp=()=>{const vp=estimateAbilityVP(configFromMasterAbility());root.querySelector('#master-vp-preview').textContent=`VP estimado: ${vp}`;const field=abilityForm.elements.vpApproved;if(!field.dataset.touched)field.value=vp;};
   abilityForm.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',()=>{if(el.name==='vpApproved')el.dataset.touched='1';updateMasterVp();}));
   updateMasterVp();
@@ -845,7 +842,7 @@ async function renderMasterSecret(root,character){
     root.querySelector('#delete-cursed-body').onclick=async()=>{if(!confirm(`Excluir definitivamente a Técnica do Corpo "${cursedBody.name}" e todas as habilidades ligadas a ela?`))return;await withBusy(()=>api.deleteCursedBodyTechnique(cursedBody.id),'Técnica do Corpo excluída.');renderMasterSecret(root,character);};
 
     const bodyAbilityForm=root.querySelector('#cursed-body-ability-form');
-    const bodyAbilityConfig=()=>{const f=new FormData(bodyAbilityForm);return {pa_cost:Number(f.get('pa')||0),ea_cost:Number(f.get('ea')||0),damage_die:Number(f.get('die')||0),damage_dice_count:Number(f.get('diceCount')||0),range:f.get('range'),targets:f.get('targets'),duration:f.get('duration'),condition_severity:f.get('condition'),condition_key:f.get('conditionKey')||null,once_per_combat:f.get('onceCombat')==='on',once_per_mission:f.get('onceMission')==='on',requires_preparation:f.get('preparation')==='on',meaningful_drawback:f.get('drawback')==='on',requires_attack:f.get('requiresAttack')==='on',is_reaction:f.get('isReaction')==='on',attack_attribute_key:f.get('attackAttribute'),attack_skill_key:f.get('attackSkill'),damage_flat_attribute_key:f.get('damageFlatAttribute')||null,uses_cursed_energy:f.get('usesCursedEnergy')==='on',forced_critical:f.get('forcedCritical')==='on',critical_threshold:Number(f.get('criticalThreshold')||20)};};
+    const bodyAbilityConfig=()=>abilityConfigFromForm(bodyAbilityForm);
     const updateBodyVp=()=>{const vp=estimateAbilityVP(bodyAbilityConfig());root.querySelector('#cursed-body-vp-preview').textContent=`VP de referência: ${vp}`;const field=bodyAbilityForm.elements.vpApproved;if(!field.dataset.touched)field.value=vp;};
     bodyAbilityForm.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',()=>{if(el.name==='vpApproved')el.dataset.touched='1';updateBodyVp();}));
     updateBodyVp();

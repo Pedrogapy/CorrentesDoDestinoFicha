@@ -160,3 +160,19 @@ Regras canônicas implementadas no site:
 - Explosão Artística usa efeito preparado e detonação manual no fim da rodada.
 - Efeitos `burn` causam dano no início do turno e podem expor ação de Apagar quando configurados.
 - Tecido de Desvio rerrola os dados do dano recém sofrido e mantém obrigatoriamente o segundo resultado.
+
+## v0.8.0 — Motor de Habilidades Estruturadas
+
+- Habilidades agora podem declarar relação de alvo (`enemy`, `ally`, `ally_or_self`, `self`, `any`) com filtro na UI e validação no banco.
+- `combat_participants.side_key` define Aliado/Inimigo/Neutro por encontro e pode ser ajustado pelo Mestre sem mudar `entity_type`.
+- A Sobrecarga de **A Linha Que Separa** possui segundo alvo real no painel. O bug anterior era ausência do bind dinâmico depois de `root.innerHTML`.
+- Segundo alvo não pode repetir o principal e é validado no servidor.
+- `combat_actions.damage_dice_factor` e `damage_flat_factor` separam redução dos dados da redução do modificador. A Linha usa `dados × 0,5` e `modificador × 1` no segundo alvo.
+- O construtor de habilidade possui campos estruturados para relação de alvo, reação, teste resistido, cura, dano próprio, recurso especial, efeitos temporários, efeito pós-acerto/resistido e Sobrecarga com segundo alvo.
+- Descrição/Mecânica continuam texto humano; os campos estruturados são a fonte da automação do combate.
+- Aiko: quatro habilidades temporais separadas, Sobrecargas, Escudo como reação de aliado, Interrupção inimigo/aliado e Costura do Acaso como rerrolagem real.
+- Kotone: Orfeu continua Ficha Filha sem turno independente; capacidades ficam travadas até manifestação. Tarukaja, Guarda de Alcance, Teoria de Manifestação e Véu da Fortuna usam o motor estruturado.
+- Jin: Coágulos reais, danos/custos corrigidos, Armamento cria equipamento temporário com best-of e Fluxo das Escamas não pede alvo externo. Circuito Hemático permanece master-only.
+- Antônio: Pincel/Postura continuam estilos de combate. Explosão Artística, queimaduras, Setas, segundo alvo e Tecido de Desvio usam automação real. Setas só apoiam Antônio/aliado.
+- Arquivos públicos do Antônio não registram a explicação narrativa que o player desconhece.
+- A migration v0.8 limpa snapshots antigos de undo por incompatibilidade estrutural; novos snapshots incluem os campos v0.8 automaticamente.
