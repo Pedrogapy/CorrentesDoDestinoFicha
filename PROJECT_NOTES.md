@@ -144,3 +144,19 @@ Regras canônicas implementadas no site:
 - Jogadores não podem criar, editar, mover ou excluir habilidades corporais.
 - Liberar a Técnica do Corpo libera as habilidades atuais; retirar acesso as desabilita novamente.
 - Jin possui `Circuito Hemático` como seed oculto e protegido por `seed_only`, para não sobrescrever progresso futuro do Mestre em reimportações.
+
+## v0.7.4 — Estilos de Combate / Antonio Fagulhas
+
+- Modos de combate são estados mutuamente exclusivos em `combat_participants.active_combat_mode`.
+- Um modo pode ser escolhido/trocado apenas no início do próprio turno, antes de outras ações, e no máximo uma vez por turno.
+- Habilidades podem declarar `requires_combat_mode`; o bloqueio existe na UI e no banco.
+- Antonio possui dois estados públicos: `magic_brush` (Pincel Mágico manifestado) e `flame_monk` (Postura de Luta).
+- Pincel Mágico libera o kit de pintura; Postura de Luta libera o moveset corpo a corpo.
+- O Pincel é manifestação/foco da técnica, não item permanente de inventário e não usa Sintonia.
+- Pincel: primeira técnica de pintura usada desde o início do turno custa -1 EA, mínimo efetivo 1.
+- Postura: primeiro ataque corpo a corpo do próprio turno recebe +1 dano.
+- Ritmo Híbrido pode premiar uma transição coerente uma única vez por combate.
+- Sobrecarga de A Linha Que Separa usa segundo alvo real e metade do dano nesse alvo.
+- Explosão Artística usa efeito preparado e detonação manual no fim da rodada.
+- Efeitos `burn` causam dano no início do turno e podem expor ação de Apagar quando configurados.
+- Tecido de Desvio rerrola os dados do dano recém sofrido e mantém obrigatoriamente o segundo resultado.

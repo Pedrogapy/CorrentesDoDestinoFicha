@@ -697,6 +697,35 @@ export async function getCombatEffects(encounterId) {
   return data || [];
 }
 
+// Ações recentes que podem receber bônus de uma reação como "As Setas Indicam a Direção".
+// O RPC já filtra o que um jogador comum pode enxergar; o Mestre recebe a visão completa.
+export async function getBoostableCombatActions(encounterId) {
+  const { data, error } = await supabase.rpc('get_boostable_combat_actions', { p_encounter_id: encounterId });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function extinguishCombatEffect(encounterId, effectId, label='Remover efeito') {
+  return withCombatUndo(encounterId, label, async()=>{
+    const { error } = await supabase.rpc('extinguish_combat_effect', {
+      p_encounter_id: encounterId,
+      p_effect_id: effectId,
+    });
+    if (error) throw error;
+  });
+}
+
+export async function detonateArtBomb(encounterId, actorCharacterId) {
+  return withCombatUndo(encounterId, 'Detonar Explosão Artística', async()=>{
+    const { data, error } = await supabase.rpc('detonate_art_bomb', {
+      p_encounter_id: encounterId,
+      p_actor_character_id: actorCharacterId,
+    });
+    if (error) throw error;
+    return data;
+  });
+}
+
 export async function useAbilityInCombat({ encounterId, actorCharacterId, abilityId, targetCharacterId=null, modeKey=null, overloadKey=null, options={}, label='Habilidade' }) {
   return withCombatUndo(encounterId, `Habilidade: ${label}`, async()=>{
     const { data, error } = await supabase.rpc('use_ability_in_combat', {

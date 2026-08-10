@@ -1,0 +1,614 @@
+{
+  "replace_abilities": true,
+  "character": {
+    "entity_type": "player",
+    "first_name": "Antônio",
+    "last_name": "Fagulhas",
+    "grade": "Grau 4",
+    "level": 5,
+    "technique_name": "Pincel Mágico",
+    "technique_description": "Antonio alterna entre a manifestação de um Pincel Mágico, usado para impor pinturas sobre a realidade, e um estilo marcial de curta distância. O Pincel libera técnicas de pintura; a Postura de Luta libera seu repertório de golpes flamejantes. Os dois estilos são mutuamente exclusivos durante o combate e podem ser escolhidos no início do próprio turno.",
+    "notes": "Estilo de Combate Híbrido. No combate, escolha Pincel Mágico ou Postura de Luta no início do turno. As habilidades incompatíveis ficam travadas automaticamente. O Ritmo Híbrido recompensa uma única transição bem preparada por combate.",
+    "attributes": {
+      "strength": 4,
+      "dexterity": 3,
+      "resistance": 3,
+      "intelligence": 1,
+      "perception": 1,
+      "will": 2,
+      "presence": 1,
+      "cursed_control": 5
+    },
+    "skills": {
+      "athletics": 0,
+      "fight": 3,
+      "grapple": 0,
+      "impact": 0,
+      "acrobatics": 0,
+      "reflexes": 2,
+      "stealth": 0,
+      "aim": 0,
+      "defend": 1,
+      "fortitude": 1,
+      "steadiness": 0,
+      "survival": 0,
+      "investigation": 0,
+      "occultism": 1,
+      "technical_sorcery": 0,
+      "medicine": 0,
+      "technology": 0,
+      "attention": 0,
+      "intuition": 1,
+      "tracking": 0,
+      "combat_reading": 0,
+      "concentration": 0,
+      "self_control": 0,
+      "mental_resistance": 0,
+      "spiritual_resistance": 0,
+      "persuasion": 0,
+      "deception": 0,
+      "intimidation": 0,
+      "leadership": 0,
+      "performance": 0,
+      "channeling": 3,
+      "reinforcement": 0,
+      "technique_control": 2,
+      "cursed_suppression": 0
+    },
+    "growth_vigor": 3,
+    "growth_reserve": 2,
+    "permanent_ps_bonus": 0,
+    "permanent_ea_bonus": 0
+  },
+  "abilities": [
+    {
+      "category": "technique",
+      "name": "Invocar Pincel Mágico",
+      "description": "Antonio manifesta o Pincel Mágico e muda seu foco para a criação de efeitos por pintura.",
+      "mechanics": "ESTILO DE COMBATE. No início do próprio turno, antes de realizar outra ação, Antonio pode invocar o Pincel Mágico sem gastar PA ou EA. Enquanto o Pincel estiver ativo, as técnicas de pintura ficam liberadas e os golpes da Postura de Luta ficam travados. A primeira técnica de pintura usada a partir do início de cada turno custa 1 EA a menos, mínimo de 1 EA. Trocar de Postura de Luta para Pincel após ter acertado corpo a corpo no turno anterior pode ativar uma única vez por combate o Ritmo Híbrido: a próxima técnica de pintura que causar dano recebe +1 de dano.",
+      "config": {
+        "pa_cost": 0,
+        "ea_cost": 0,
+        "damage_die": 0,
+        "damage_dice_count": 0,
+        "range": "self",
+        "targets": "self",
+        "duration": "instant",
+        "condition_severity": "none",
+        "condition_key": null,
+        "once_per_combat": false,
+        "once_per_mission": false,
+        "requires_preparation": false,
+        "meaningful_drawback": false,
+        "requires_attack": false,
+        "attack_attribute_key": "cursed_control",
+        "attack_skill_key": "channeling",
+        "damage_flat_attribute_key": null,
+        "uses_cursed_energy": false,
+        "forced_critical": false,
+        "critical_threshold": 20,
+        "target_mode": "self",
+        "special_action": "set_combat_mode",
+        "combat_mode_key": "magic_brush"
+      },
+      "vp_estimated": 1,
+      "vp_approved": 1,
+      "limit_override": true
+    },
+    {
+      "category": "technique",
+      "name": "A Linha Que Separa",
+      "description": "Antonio traça uma linha no ar e o desenho se converte em um corte projetado sobre o alvo.",
+      "mechanics": "Requer Pincel Mágico. Custo: 1 PA e 2 EA. Ataque de Controle Amaldiçoado + Canalização. Dano: 1d6 + Mod. Controle Amaldiçoado. SOBRECARGA: +3 EA permite escolher um segundo alvo que esteja próximo ou alinhado ao primeiro pela visão de Antonio. O segundo alvo recebe um segundo teste de ataque e, caso atingido, sofre metade do dano final.",
+      "config": {
+        "pa_cost": 1,
+        "ea_cost": 2,
+        "damage_die": 6,
+        "damage_dice_count": 1,
+        "range": "near",
+        "targets": "one",
+        "duration": "instant",
+        "condition_severity": "none",
+        "condition_key": null,
+        "once_per_combat": false,
+        "once_per_mission": false,
+        "requires_preparation": false,
+        "meaningful_drawback": false,
+        "requires_attack": true,
+        "attack_attribute_key": "cursed_control",
+        "attack_skill_key": "channeling",
+        "damage_flat_attribute_key": "cursed_control",
+        "uses_cursed_energy": true,
+        "forced_critical": false,
+        "critical_threshold": 20,
+        "requires_combat_mode": "magic_brush",
+        "tags": [
+          "painting_technique"
+        ],
+        "overloads": [
+          {
+            "key": "second_target",
+            "label": "Sobrecarga — segundo alvo (+3 EA)",
+            "extra_ea": 3,
+            "overrides": {
+              "requires_secondary_target": true,
+              "secondary_target_damage_factor": 0.5
+            }
+          }
+        ]
+      },
+      "vp_estimated": 3,
+      "vp_approved": 3,
+      "limit_override": true
+    },
+    {
+      "category": "technique",
+      "name": "Explosão Artística",
+      "description": "Antonio pinta uma bomba no chão e deixa o desenho carregado para explodir no fim da rodada.",
+      "mechanics": "Requer Pincel Mágico. Custo: 1 PA e 7 EA. Escolha no site as criaturas dentro da área quando a bomba for preparada. Só pode existir 1 Explosão Artística preparada por vez. No fim da rodada, Antonio ou o Mestre usa “Detonar no fim da rodada”. A explosão causa 1d8 + 2 + Mod. Controle Amaldiçoado. Cada alvo testa Destreza + Reflexos contra CD 8 + Controle Amaldiçoado + Canalização de Antonio; sucesso reduz o dano pela metade.",
+      "config": {
+        "pa_cost": 1,
+        "ea_cost": 7,
+        "damage_die": 0,
+        "damage_dice_count": 0,
+        "range": "near",
+        "targets": "area",
+        "duration": "instant",
+        "condition_severity": "none",
+        "condition_key": null,
+        "once_per_combat": false,
+        "once_per_mission": false,
+        "requires_preparation": false,
+        "meaningful_drawback": false,
+        "requires_attack": false,
+        "attack_attribute_key": "cursed_control",
+        "attack_skill_key": "channeling",
+        "damage_flat_attribute_key": null,
+        "uses_cursed_energy": true,
+        "forced_critical": false,
+        "critical_threshold": 20,
+        "requires_combat_mode": "magic_brush",
+        "tags": [
+          "painting_technique"
+        ],
+        "target_mode": "multiple",
+        "special_action": "place_delayed_bomb",
+        "bomb_damage_dice_count": 1,
+        "bomb_damage_die": 8,
+        "bomb_flat_bonus": 2,
+        "bomb_flat_attribute_key": "cursed_control"
+      },
+      "vp_estimated": 4,
+      "vp_approved": 4,
+      "limit_override": true
+    },
+    {
+      "category": "technique",
+      "name": "Eu Pintei Eles Queimando",
+      "description": "Antonio pinta o alvo em combustão e faz a imagem se impor sobre ele como chamas reais.",
+      "mechanics": "Requer Pincel Mágico. Custo: 1 PA e 3 EA. Ataque de Controle Amaldiçoado + Canalização. Dano inicial: 1d6 + Mod. Controle Amaldiçoado. Em Chamas por 2 turnos: no início de cada turno do alvo, sofre 1d4 de dano. O alvo pode gastar 1 PA no próprio turno para apagar. Usar novamente em alguém que já está Em Chamas apenas renova a duração; não reaplica o dano inicial e não acumula o efeito.",
+      "config": {
+        "pa_cost": 1,
+        "ea_cost": 3,
+        "damage_die": 6,
+        "damage_dice_count": 1,
+        "range": "near",
+        "targets": "one",
+        "duration": "instant",
+        "condition_severity": "none",
+        "condition_key": null,
+        "once_per_combat": false,
+        "once_per_mission": false,
+        "requires_preparation": false,
+        "meaningful_drawback": false,
+        "requires_attack": true,
+        "attack_attribute_key": "cursed_control",
+        "attack_skill_key": "channeling",
+        "damage_flat_attribute_key": "cursed_control",
+        "uses_cursed_energy": true,
+        "forced_critical": false,
+        "critical_threshold": 20,
+        "requires_combat_mode": "magic_brush",
+        "tags": [
+          "painting_technique"
+        ],
+        "on_hit_effect": {
+          "type": "burn",
+          "key": "burning",
+          "name": "Em Chamas",
+          "remaining_turns": 2,
+          "start_turn_damage_dice_count": 1,
+          "start_turn_damage_die": 4,
+          "extinguish_pa_cost": 1,
+          "refresh_only_if_existing": true
+        }
+      },
+      "vp_estimated": 4,
+      "vp_approved": 4,
+      "limit_override": true
+    },
+    {
+      "category": "technique",
+      "name": "As Setas Indicam a Direção",
+      "description": "Antonio pinta linhas-guia que corrigem a trajetória de um golpe que acabou de ser executado.",
+      "mechanics": "REAÇÃO. Requer Pincel Mágico. Custo: 1 PA e 3 EA. Limite: 1 vez por rodada. Depois que um ataque de Antonio ou de um aliado for rolado, selecione o ataque mais recente no painel e conceda +2 ao total de acerto. O segundo valor é o definitivo para verificar se o ataque superou a CA. Não corrige 1 natural.",
+      "config": {
+        "pa_cost": 1,
+        "ea_cost": 3,
+        "damage_die": 0,
+        "damage_dice_count": 0,
+        "range": "near",
+        "targets": "one",
+        "duration": "instant",
+        "condition_severity": "none",
+        "condition_key": null,
+        "once_per_combat": false,
+        "once_per_mission": false,
+        "requires_preparation": false,
+        "meaningful_drawback": false,
+        "requires_attack": false,
+        "attack_attribute_key": "cursed_control",
+        "attack_skill_key": "channeling",
+        "damage_flat_attribute_key": null,
+        "uses_cursed_energy": true,
+        "forced_critical": false,
+        "critical_threshold": 20,
+        "requires_combat_mode": "magic_brush",
+        "tags": [
+          "painting_technique"
+        ],
+        "special_action": "boost_recent_attack",
+        "target_mode": "self",
+        "is_reaction": true,
+        "activation_timing": "reaction",
+        "once_per_round": true,
+        "attack_bonus": 2
+      },
+      "vp_estimated": 3,
+      "vp_approved": 3,
+      "limit_override": true
+    },
+    {
+      "category": "general",
+      "name": "Assumir Postura de Luta",
+      "description": "Antonio recolhe o foco de pintura e entra em sua postura marcial, preparando golpes desarmados rápidos e explosivos.",
+      "mechanics": "ESTILO DE COMBATE. No início do próprio turno, antes de realizar outra ação, Antonio pode assumir a Postura de Luta sem gastar PA ou EA. Enquanto estiver nela, os golpes do estilo Monge Flamejante ficam liberados e as técnicas do Pincel Mágico ficam travadas. O primeiro ataque corpo a corpo realizado a partir do início de cada turno recebe +1 de dano. Trocar de Pincel para Postura após ter acertado uma técnica de pintura no turno anterior pode ativar uma única vez por combate o Ritmo Híbrido: o próximo ataque corpo a corpo recebe +1 no acerto.",
+      "config": {
+        "pa_cost": 0,
+        "ea_cost": 0,
+        "damage_die": 0,
+        "damage_dice_count": 0,
+        "range": "self",
+        "targets": "self",
+        "duration": "instant",
+        "condition_severity": "none",
+        "condition_key": null,
+        "once_per_combat": false,
+        "once_per_mission": false,
+        "requires_preparation": false,
+        "meaningful_drawback": false,
+        "requires_attack": false,
+        "attack_attribute_key": "cursed_control",
+        "attack_skill_key": "channeling",
+        "damage_flat_attribute_key": null,
+        "uses_cursed_energy": false,
+        "forced_critical": false,
+        "critical_threshold": 20,
+        "target_mode": "self",
+        "special_action": "set_combat_mode",
+        "combat_mode_key": "flame_monk"
+      },
+      "vp_estimated": 1,
+      "vp_approved": 1,
+      "limit_override": true
+    },
+    {
+      "category": "general",
+      "name": "Golpe de Explosão",
+      "description": "Um soco, chute, cotovelada ou joelhada executado com uma explosão curta no instante do impacto.",
+      "mechanics": "Requer Postura de Luta. Custo: 1 PA e 2 EA. Ataque de Força + Lutar. Dano: 1d6 + o maior modificador entre Força e Controle Amaldiçoado.",
+      "config": {
+        "pa_cost": 1,
+        "ea_cost": 2,
+        "damage_die": 6,
+        "damage_dice_count": 1,
+        "range": "melee",
+        "targets": "one",
+        "duration": "instant",
+        "condition_severity": "none",
+        "condition_key": null,
+        "once_per_combat": false,
+        "once_per_mission": false,
+        "requires_preparation": false,
+        "meaningful_drawback": false,
+        "requires_attack": true,
+        "attack_attribute_key": "strength",
+        "attack_skill_key": "fight",
+        "damage_flat_attribute_key": null,
+        "uses_cursed_energy": true,
+        "forced_critical": false,
+        "critical_threshold": 20,
+        "requires_combat_mode": "flame_monk",
+        "tags": [
+          "fire_martial"
+        ],
+        "damage_flat_best_of": [
+          "strength",
+          "cursed_control"
+        ]
+      },
+      "vp_estimated": 2,
+      "vp_approved": 2,
+      "limit_override": true
+    },
+    {
+      "category": "general",
+      "name": "Chute de Ruptura",
+      "description": "Antonio descarrega um chute pesado capaz de quebrar a posição do adversário.",
+      "mechanics": "Requer Postura de Luta. Custo: 1 PA e 3 EA. Ataque de Força + Lutar. Dano: 1d6 + o maior modificador entre Força e Controle Amaldiçoado. Antes de atacar, escolha o efeito desejado. Se acertar, o alvo testa Resistência + Firmeza contra CD 8 + Força + Lutar de Antonio. Em falha, Antonio o empurra para Longe OU aplica -1 no próximo ataque do alvo.",
+      "config": {
+        "pa_cost": 1,
+        "ea_cost": 3,
+        "damage_die": 6,
+        "damage_dice_count": 1,
+        "range": "melee",
+        "targets": "one",
+        "duration": "instant",
+        "condition_severity": "none",
+        "condition_key": null,
+        "once_per_combat": false,
+        "once_per_mission": false,
+        "requires_preparation": false,
+        "meaningful_drawback": false,
+        "requires_attack": true,
+        "attack_attribute_key": "strength",
+        "attack_skill_key": "fight",
+        "damage_flat_attribute_key": null,
+        "uses_cursed_energy": true,
+        "forced_critical": false,
+        "critical_threshold": 20,
+        "requires_combat_mode": "flame_monk",
+        "tags": [
+          "fire_martial"
+        ],
+        "damage_flat_best_of": [
+          "strength",
+          "cursed_control"
+        ],
+        "usage_scope": "mode",
+        "modes": [
+          {
+            "key": "push",
+            "label": "Ruptura — empurrar em caso de falha",
+            "on_hit_effect": {
+              "type": "contest_effect",
+              "name": "Chute de Ruptura — Firmeza",
+              "defender_attribute": "resistance",
+              "defender_skill": "steadiness",
+              "dc_attribute": "strength",
+              "dc_skill": "fight",
+              "on_fail_key": "rupture_pushed",
+              "on_fail_name": "Afastado pelo Chute de Ruptura",
+              "on_fail_remaining_turns": 1,
+              "on_fail_data": {
+                "remove_on_target_turn_start": true,
+                "narrative_push": "far"
+              }
+            }
+          },
+          {
+            "key": "stagger",
+            "label": "Ruptura — -1 no próximo ataque em caso de falha",
+            "on_hit_effect": {
+              "type": "contest_effect",
+              "name": "Chute de Ruptura — Firmeza",
+              "defender_attribute": "resistance",
+              "defender_skill": "steadiness",
+              "dc_attribute": "strength",
+              "dc_skill": "fight",
+              "on_fail_key": "rupture_unsteady",
+              "on_fail_name": "Desestabilizado pelo Chute de Ruptura",
+              "on_fail_uses": 1,
+              "on_fail_data": {
+                "attack_bonus": -1,
+                "remove_when_empty": true
+              }
+            }
+          }
+        ]
+      },
+      "vp_estimated": 3,
+      "vp_approved": 3,
+      "limit_override": true
+    },
+    {
+      "category": "general",
+      "name": "Sequência Escaldante",
+      "description": "Antonio encadeia diversos golpes desarmados sem perder o ritmo entre um impacto e outro.",
+      "mechanics": "Requer Postura de Luta. Custo: 1 PA e 4 EA. Um único teste de Força + Lutar. Dano: 2d4 + o maior modificador entre Força e Controle Amaldiçoado. Se Antonio acertou o mesmo alvo com um ataque corpo a corpo no próprio turno anterior, recebe +1 no acerto desta técnica.",
+      "config": {
+        "pa_cost": 1,
+        "ea_cost": 4,
+        "damage_die": 4,
+        "damage_dice_count": 2,
+        "range": "melee",
+        "targets": "one",
+        "duration": "instant",
+        "condition_severity": "none",
+        "condition_key": null,
+        "once_per_combat": false,
+        "once_per_mission": false,
+        "requires_preparation": false,
+        "meaningful_drawback": false,
+        "requires_attack": true,
+        "attack_attribute_key": "strength",
+        "attack_skill_key": "fight",
+        "damage_flat_attribute_key": null,
+        "uses_cursed_energy": true,
+        "forced_critical": false,
+        "critical_threshold": 20,
+        "requires_combat_mode": "flame_monk",
+        "tags": [
+          "fire_martial"
+        ],
+        "damage_flat_best_of": [
+          "strength",
+          "cursed_control"
+        ],
+        "prior_turn_same_target_attack_bonus": 1
+      },
+      "vp_estimated": 3,
+      "vp_approved": 3,
+      "limit_override": true
+    },
+    {
+      "category": "general",
+      "name": "Ponto de Ignição",
+      "description": "Antonio concentra o impacto num ponto e deixa o alvo queimando depois do golpe.",
+      "mechanics": "Requer Postura de Luta. Custo: 1 PA e 4 EA. Ataque de Força + Lutar. Dano inicial: 1d6 + o maior modificador entre Força e Controle Amaldiçoado. Se acertar, no início do próximo turno do alvo ele sofre 1d4 de dano flamejante. O alvo pode gastar 1 PA no próprio turno para apagar antes de sofrer uma aplicação futura.",
+      "config": {
+        "pa_cost": 1,
+        "ea_cost": 4,
+        "damage_die": 6,
+        "damage_dice_count": 1,
+        "range": "melee",
+        "targets": "one",
+        "duration": "instant",
+        "condition_severity": "none",
+        "condition_key": null,
+        "once_per_combat": false,
+        "once_per_mission": false,
+        "requires_preparation": false,
+        "meaningful_drawback": false,
+        "requires_attack": true,
+        "attack_attribute_key": "strength",
+        "attack_skill_key": "fight",
+        "damage_flat_attribute_key": null,
+        "uses_cursed_energy": true,
+        "forced_critical": false,
+        "critical_threshold": 20,
+        "requires_combat_mode": "flame_monk",
+        "tags": [
+          "fire_martial"
+        ],
+        "damage_flat_best_of": [
+          "strength",
+          "cursed_control"
+        ],
+        "on_hit_effect": {
+          "type": "burn",
+          "key": "ignition_burn",
+          "name": "Ponto de Ignição",
+          "remaining_turns": 1,
+          "start_turn_damage_dice_count": 1,
+          "start_turn_damage_die": 4,
+          "extinguish_pa_cost": 1,
+          "refresh_only_if_existing": false
+        }
+      },
+      "vp_estimated": 3,
+      "vp_approved": 3,
+      "limit_override": true
+    },
+    {
+      "category": "general",
+      "name": "Punho da Fornalha",
+      "description": "Antonio comprime toda a execução num golpe pesado; uma microexplosão acontece depois do impacto e abala a resistência do alvo.",
+      "mechanics": "Requer Postura de Luta. Custo: 1 PA e 7 EA. Ataque de Força + Lutar. Dano: 1d8 + 2 + o maior modificador entre Força e Controle Amaldiçoado. Se acertar, o alvo recebe -1 em Fortitude até o fim do próximo turno dele.",
+      "config": {
+        "pa_cost": 1,
+        "ea_cost": 7,
+        "damage_die": 8,
+        "damage_dice_count": 1,
+        "range": "melee",
+        "targets": "one",
+        "duration": "instant",
+        "condition_severity": "none",
+        "condition_key": null,
+        "once_per_combat": false,
+        "once_per_mission": false,
+        "requires_preparation": false,
+        "meaningful_drawback": false,
+        "requires_attack": true,
+        "attack_attribute_key": "strength",
+        "attack_skill_key": "fight",
+        "damage_flat_attribute_key": null,
+        "uses_cursed_energy": true,
+        "forced_critical": false,
+        "critical_threshold": 20,
+        "requires_combat_mode": "flame_monk",
+        "tags": [
+          "fire_martial"
+        ],
+        "damage_flat_best_of": [
+          "strength",
+          "cursed_control"
+        ],
+        "damage_flat_bonus": 2,
+        "on_hit_effect": {
+          "type": "effect",
+          "key": "furnace_fortitude",
+          "name": "Fortitude Abalada",
+          "remaining_turns": 1,
+          "data": {
+            "skill_modifiers": {
+              "fortitude": -1
+            },
+            "decrement_on": "target_end"
+          }
+        }
+      },
+      "vp_estimated": 4,
+      "vp_approved": 4,
+      "limit_override": true
+    }
+  ],
+  "equipment": [
+    {
+      "name": "Tecido de Desvio",
+      "equipment_type": "Roupa / Armadura",
+      "category": "armor",
+      "subtype": "Traje amaldiçoado de Aventurine",
+      "is_cursed": true,
+      "grade": "Grau 4",
+      "description": "Traje elegante e sóbrio confeccionado por Aventurine para Antonio. O tecido parece deslocar a consequência de um impacto no instante em que ele acontece.",
+      "mechanics": "Enquanto equipado no Corpo, consome 1 Sintonia. Uma vez por combate, quando Antonio sofrer dano de um ataque, ele pode ativar Tecido de Desvio como reação. Os dados de dano daquele ataque são rerrolados e o segundo resultado deve ser mantido, mesmo se for maior.",
+      "image_url": "",
+      "charges_current": null,
+      "charges_max": null,
+      "active": true,
+      "hands": 0,
+      "weapon_profile": null,
+      "weapon_range": "melee",
+      "wear_slot": "body",
+      "can_hold": false,
+      "attack_config": {
+        "enabled": false
+      },
+      "effects": [
+        {
+          "id": "993d69a0-0b61-471d-90d4-7447b64ded79",
+          "name": "Tecido de Desvio",
+          "type": "reaction",
+          "description": "O tecido força o resultado do impacto a se desviar para uma nova possibilidade.",
+          "mechanics": "REAÇÃO, 1 vez por combate. Depois de Antonio sofrer dano de um ataque, rerrole somente os dados de dano do golpe. O segundo resultado substitui o primeiro e deve ser mantido, mesmo se causar mais dano.",
+          "vp": 2,
+          "config": {
+            "pa_cost": 0,
+            "ea_cost": 0,
+            "range": "self",
+            "targets": "self",
+            "target_mode": "self",
+            "requires_attack": false,
+            "is_reaction": true,
+            "activation_timing": "reaction",
+            "once_per_combat": true,
+            "special_action": "reroll_recent_damage"
+          }
+        }
+      ],
+      "vp_limit_override": false,
+      "equip_slot": "body"
+    }
+  ]
+}

@@ -264,3 +264,27 @@ label { display:grid; gap:6px; font-size:.83rem; font-weight:750; color:#c8c4cc;
   .combat-entity-group .btn-row { display:grid; grid-template-columns:1fr; }
   .entity-add-btn { width:100%; text-align:left; }
 }
+
+/* v0.7.4 - estilos de combate e efeitos temporários acionáveis */
+.combat-mode-pill{
+  border-color:#c44731 !important;
+  background:rgba(196,71,49,.12);
+  color:#ffd8cf;
+}
+.combat-effect-chip{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  flex-wrap:wrap;
+  margin:2px 5px 2px 0;
+}
+.combat-effect-chip .btn{
+  padding:4px 8px;
+  font-size:.72rem;
+}
+.list-item.locked .combat-mode-pill{
+  opacity:.75;
+}
+select[multiple]{
+  min-height:78px;
+}

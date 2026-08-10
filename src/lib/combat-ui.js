@@ -10,6 +10,12 @@ const COMBAT_ENTITY_GROUPS = [
   { key:'summon', title:'Invocações', cls:'summon' },
 ];
 
+const COMBAT_MODE_LABELS = {
+  magic_brush: 'PINCEL MÁGICO',
+  flame_monk: 'POSTURA DE LUTA',
+};
+function combatModeLabel(key) { return COMBAT_MODE_LABELS[key] || key || 'SEM ESTILO'; }
+
 function combatEntityPickerHtml(characters=[], inCombat=new Set(), esc=(v)=>String(v), getName=(c)=>c?.first_name||'Entidade') {
   const available=characters.filter(c=>!inCombat.has(c.id));
   if(!available.length) return '<p class="muted">Todas as fichas disponíveis já estão no combate.</p>';
@@ -116,7 +122,7 @@ function participantCard(p, ctx, editable=false, activeParticipantId=null, caMap
       ? `<button class="btn warn" data-end-turn="${p.id}" data-turn-name="${esc(displayName)}">Encerrar meu turno</button>`
       : '');
   return `<div class="list-item combat-participant ${isActive?'turn-active':''}" data-participant="${p.id}">
-    <div class="btn-row"><div class="title">${esc(displayName)}</div><span class="pill">Iniciativa ${p.initiative}</span>${isActive?'<span class="pill good">TURNO ATIVO</span>':''}${p.black_flash_turns>0?`<span class="pill bad">Fluxo Negro ${p.black_flash_turns}</span>`:''}${p.defeated?'<span class="pill bad">Derrotado</span>':''}</div>
+    <div class="btn-row"><div class="title">${esc(displayName)}</div><span class="pill">Iniciativa ${p.initiative}</span>${p.active_combat_mode?`<span class="pill combat-mode-pill">${esc(combatModeLabel(p.active_combat_mode))}</span>`:''}${p.combat_bridge_type?`<span class="pill warn">Ritmo Híbrido: ${p.combat_bridge_type==='brush_damage'?'+1 dano na próxima pintura':'+1 acerto no próximo corpo a corpo'}</span>`:''}${isActive?'<span class="pill good">TURNO ATIVO</span>':''}${p.black_flash_turns>0?`<span class="pill bad">Fluxo Negro ${p.black_flash_turns}</span>`:''}${p.defeated?'<span class="pill bad">Derrotado</span>':''}</div>
     <div class="grid grid-4 compact-stats" style="margin-top:10px"><div><span class="muted small">PS</span><div><strong>${p.current_ps??d.ps}</strong> / ${d.ps}</div></div><div><span class="muted small">EA</span><div><strong>${p.current_ea??d.ea}</strong> / ${d.ea}</div></div><div><span class="muted small">PA</span><div><strong>${p.current_pa??d.pa}</strong> / ${d.pa}</div></div><div><span class="muted small">CA</span><div><strong>${caMap[p.character_id]??d.ca}</strong></div></div></div>
     <div style="margin-top:9px">${conditionNames(conditions,state.conditions,esc)}</div>
     ${editable?`<div class="field-row-3" style="margin-top:10px"><label>PS<input data-cps="${p.id}" type="number" value="${p.current_ps??d.ps}" /></label><label>EA<input data-cea="${p.id}" type="number" value="${p.current_ea??d.ea}" /></label><label>PA<input data-cpa="${p.id}" type="number" value="${p.current_pa??d.pa}" /></label></div>`:''}
@@ -198,30 +204,49 @@ function overloadSelectHtml(ability, key, esc, disabled=false) {
 }
 
 function targetControlHtml({config,key,targets,actorId,actorName,esc,disabled=false,prefix='ability'}) {
+  const special=config.special_action||'';
+  if(special==='set_combat_mode' || special==='boost_recent_attack') return '';
   if(isSelfTarget(config)) return `<div class="meta" style="margin-top:8px">Alvo: <strong>${esc(actorName)}</strong> (próprio)</div>`;
-  const hostile=Boolean(config.requires_attack || config.contest);
-  const opts=(hostile?targets.filter(t=>t.character_id!==actorId):targets)
-    .filter(t=>!t.defeated)
-    .map(t=>`<option value="${t.character_id}">${esc(t.display_name)} • CA ${t.ca}</option>`).join('');
+  const hostile=Boolean(config.requires_attack || config.contest || config.target_mode==='multiple');
+  const available=(hostile?targets.filter(t=>t.character_id!==actorId):targets).filter(t=>!t.defeated);
+  if(config.target_mode==='multiple') {
+    const opts=available.map(t=>`<option value="${t.character_id}">${esc(t.display_name)} • CA ${t.ca}</option>`).join('');
+    return `<label style="margin-top:8px">Alvos dentro da área <span class="muted small">(Ctrl/clique para vários)</span><select multiple size="${Math.min(6,Math.max(2,available.length))}" data-${prefix}-targets="${key}" ${disabled?'disabled':''}>${opts}</select></label>`;
+  }
+  const opts=available.map(t=>`<option value="${t.character_id}">${esc(t.display_name)} • CA ${t.ca}</option>`).join('');
   const selfOpt=!hostile && !targets.some(t=>t.character_id===actorId)?`<option value="${actorId}">${esc(actorName)}</option>`:'';
   return `<label style="margin-top:8px">Alvo<select data-${prefix}-target="${key}" ${disabled?'disabled':''}>${opts}${selfOpt}</select></label>`;
 }
 
-function abilityCardCombat({ability,variant,targets,actorId,actorName,esc,enabled,locked=false,prefix='ability',summonName=''}) {
+function abilityCardCombat({ability,variant,targets,actorId,actorName,esc,enabled,locked=false,prefix='ability',summonName='',activeCombatMode=null,boostableActions=[]}) {
   const cfg=variant.config||{};
   const reaction=isReactionConfig(cfg);
-  const canUse=!locked && (enabled || reaction);
-  const key=`${ability.id}:${variant.modeKey||'base'}`;
   const special=cfg.special_action||'';
+  const requiredMode=cfg.requires_combat_mode||null;
+  const modeLocked=Boolean(requiredMode && special!=='set_combat_mode' && activeCombatMode!==requiredMode);
+  const alreadyMode=special==='set_combat_mode' && activeCombatMode===cfg.combat_mode_key;
+  const canUse=!locked && !modeLocked && !alreadyMode && (enabled || reaction);
+  const key=`${ability.id}:${variant.modeKey||'base'}`;
   const resourceText=cfg.resource_cost?.key?` • usa ${Number(cfg.resource_cost.amount||1)} ${esc(cfg.resource_cost.key)}`:'';
-  const lockNote=locked?`<div class="notice" style="margin-top:8px">TRAVADO: manifeste ${esc(summonName||'a invocação')} para liberar esta habilidade.</div>`:'';
+  const notices=[];
+  if(locked) notices.push(`TRAVADO: manifeste ${esc(summonName||'a invocação')} para liberar esta habilidade.`);
+  if(modeLocked) notices.push(`TRAVADO: exige ${esc(combatModeLabel(requiredMode))}. Escolha esse estilo no início do seu turno.`);
+  if(alreadyMode) notices.push(`${esc(combatModeLabel(cfg.combat_mode_key))} já está ativo.`);
+  const lockNote=notices.map(n=>`<div class="notice" style="margin-top:8px">${n}</div>`).join('');
   const reactionPill=reaction?'<span class="pill good">REAÇÃO</span>':'';
   const bodyPill=ability.cursed_body_technique_id?'<span class="pill bad">TÉCNICA DO CORPO</span>':'';
+  const stylePill=requiredMode||special==='set_combat_mode'?`<span class="pill combat-mode-pill">${esc(combatModeLabel(requiredMode||cfg.combat_mode_key))}</span>`:'';
   const modeTitle=variant.modeKey?`<div class="meta">Modo: ${esc(variant.label)}</div>`:'';
   const overload=overloadSelectHtml(ability,key,esc,!canUse);
   const target=targetControlHtml({config:cfg,key,targets,actorId,actorName,esc,disabled:!canUse,prefix});
   const weaponOptions=special==='create_weapon'?`<div class="field-row" style="margin-top:8px"><label>Perfil da arma<select data-weapon-profile="${key}" ${canUse?'':'disabled'}><option value="light">Leve • 1 PS</option><option value="standard" selected>Padrão • 1d4 PS</option><option value="heavy">Pesada • 1d6 PS</option><option value="very_heavy">Muito pesada • 1d8 PS</option></select></label><label>Atributo da arma<select data-weapon-attribute="${key}" ${canUse?'':'disabled'}><option value="strength">Força</option><option value="dexterity">Destreza</option></select></label></div>`:'';
-  return `<div class="list-item ${locked?'locked':''}"><div class="btn-row"><div class="title">${esc(ability.name)}</div>${bodyPill}${reactionPill}${locked?'<span class="pill bad">TRAVADO</span>':''}</div>${modeTitle}<div class="meta">${esc(configCostText(cfg))}${resourceText}</div><div class="body">${esc(ability.mechanics||ability.description||'')}</div>${target}${overload}${weaponOptions}${lockNote}<button class="btn primary" data-${prefix}-use="${key}" data-ability-id="${ability.id}" data-mode-key="${esc(variant.modeKey||'')}" style="margin-top:8px" ${canUse?'':'disabled'}>${special==='activate_summon'?'Manifestar':special==='create_weapon'?'Criar arma':'Usar habilidade'}</button></div>`;
+  const needsSecondary=(Array.isArray(ability?.config?.overloads)?ability.config.overloads:[]).some(o=>o?.overrides?.requires_secondary_target) || Boolean(cfg.requires_secondary_target);
+  const secondaryOptions=targets.filter(t=>t.character_id!==actorId&&!t.defeated).map(t=>`<option value="${t.character_id}">${esc(t.display_name)} • CA ${t.ca}</option>`).join('');
+  const secondary=needsSecondary?`<label style="margin-top:8px">Segundo alvo <span class="muted small">(usado apenas na Sobrecarga)</span><select data-secondary-target="${key}" ${canUse?'':'disabled'}>${secondaryOptions}</select></label>`:'';
+  const recent=boostableActions.slice(0,8).map(a=>`<option value="${a.id}">${esc(a.attacker_name)} → ${esc(a.target_name)} • ${esc(a.label)} • ${a.attack_total??'—'} vs CA ${a.target_ca??'—'}</option>`).join('');
+  const actionPicker=special==='boost_recent_attack'?`<label style="margin-top:8px">Ataque que acabou de ser rolado<select data-recent-action="${key}" ${canUse&&recent?'':'disabled'}>${recent||'<option value="">Nenhum ataque elegível agora</option>'}</select></label>`:'';
+  const buttonLabel=special==='activate_summon'?'Manifestar':special==='create_weapon'?'Criar arma':special==='set_combat_mode'?(alreadyMode?'Estilo ativo':cfg.combat_mode_key==='magic_brush'?'Invocar Pincel Mágico':'Assumir Postura de Luta'):special==='place_delayed_bomb'?'Preparar bomba':special==='boost_recent_attack'?'Aplicar +2 no acerto':'Usar habilidade';
+  return `<div class="list-item ${locked||modeLocked?'locked':''}"><div class="btn-row"><div class="title">${esc(ability.name)}</div>${bodyPill}${stylePill}${reactionPill}${locked||modeLocked?'<span class="pill bad">TRAVADO</span>':''}</div>${modeTitle}<div class="meta">${esc(configCostText(cfg))}${resourceText}</div><div class="body">${esc(ability.mechanics||ability.description||'')}</div>${target}${overload}${secondary}${actionPicker}${weaponOptions}${lockNote}<button class="btn primary" data-${prefix}-use="${key}" data-ability-id="${ability.id}" data-mode-key="${esc(variant.modeKey||'')}" style="margin-top:8px" ${canUse?'':'disabled'}>${buttonLabel}</button></div>`;
 }
 
 function equipmentEffectCardCombat({item,effect,variant,targets,actorId,actorName,esc,enabled,prefix='equipment-effect'}) {
@@ -233,10 +258,15 @@ function equipmentEffectCardCombat({item,effect,variant,targets,actorId,actorNam
   return `<div class="list-item"><div class="btn-row"><div class="title">${esc(item.name)} • ${esc(effect.name)}</div>${reaction?'<span class="pill good">REAÇÃO</span>':''}</div>${variant.modeKey?`<div class="meta">Modo: ${esc(variant.label)}</div>`:''}<div class="meta">${esc(configCostText(cfg))}</div><div class="body">${esc(effect.mechanics||effect.description||'')}</div>${target}<button class="btn primary" data-${prefix}-use="${key}" data-item-id="${item.id}" data-effect-id="${esc(effect.id)}" data-mode-key="${esc(variant.modeKey||'')}" style="margin-top:8px" ${canUse?'':'disabled'}>Usar efeito</button></div>`;
 }
 
-function combatEffectsHtml(effects, characterId, esc) {
+function combatEffectsHtml(effects, characterId, esc, {ownTurn=false,prefix='combat'}={}) {
   const mine=effects.filter(e=>e.target_character_id===characterId);
   if(!mine.length) return '<span class="muted small">Nenhum efeito temporário ativo.</span>';
-  return mine.map(e=>`<span class="pill warn">${esc(e.name)}${e.remaining_turns!=null?` • ${e.remaining_turns} turno(s)`:''}${e.uses_remaining!=null?` • ${e.uses_remaining} uso(s)`:''}</span>`).join(' ');
+  return mine.map(e=>{
+    const data=e?.data&&typeof e.data==='object'?e.data:{};
+    const extinguish=Number(data.extinguish_pa_cost||0)>0?`<button class="btn ghost" data-extinguish-effect="${e.id}" ${ownTurn?'':'disabled'}>Apagar • ${Number(data.extinguish_pa_cost)} PA</button>`:'';
+    const detonate=e.effect_key==='art_bomb'&&e.source_character_id===characterId?`<button class="btn bad" data-detonate-bomb="${characterId}">Detonar no fim da rodada</button>`:'';
+    return `<span class="combat-effect-chip"><span class="pill warn">${esc(e.name)}${e.remaining_turns!=null?` • ${e.remaining_turns} turno(s)`:''}${e.uses_remaining!=null?` • ${e.uses_remaining} uso(s)`:''}</span>${extinguish}${detonate}</span>`;
+  }).join(' ');
 }
 
 function specialResourcesHtml(participant, esc, ownTurn, prefix='resource') {
@@ -336,12 +366,13 @@ export async function renderPlayerCombatPageV2(ctx) {
   ctx.subscribeCombatRealtime?.(active.id,()=>renderPlayerCombatPageV2(ctx));
 
   const participants=await api.getCombatParticipants(active.id);
-  const [targetsRaw,actions,equipment,bundle,effects]=await Promise.all([
+  const [targetsRaw,actions,equipment,bundle,effects,boostableActions]=await Promise.all([
     safeCombatRead('alvos do combate',()=>api.getCombatTargets(active.id),null),
     safeCombatRead('histórico de ações',()=>api.getVisibleCombatActions(active.id),[]),
     safeCombatRead('equipamentos em combate',()=>api.getEquipment(state.character.id),[]),
     loadAbilityBundle(state.character.id),
     safeCombatRead('efeitos temporários',()=>api.getCombatEffects(active.id),[]),
+    safeCombatRead('ataques que podem receber bônus',()=>api.getBoostableCombatActions(active.id),[]),
   ]);
   const targets=Array.isArray(targetsRaw)?targetsRaw:fallbackTargetsFromParticipants(participants);
   const mine=participants.find(p=>p.character_id===state.character.id);
@@ -353,8 +384,8 @@ export async function renderPlayerCombatPageV2(ctx) {
   const approvedAbilities=bundle.parentAbilities.filter(a=>a.status==='approved');
   const activeSummonId=mine?.active_summon_character_id||null;
   const activeSummon=bundle.children.find(x=>x.child.id===activeSummonId)||null;
-  const childAbilityCards=bundle.children.flatMap(({child,abilities})=>abilities.filter(a=>a.status==='approved').flatMap(a=>abilityVariants(a).map(variant=>abilityCardCombat({ability:a,variant,targets,actorId:state.character.id,actorName:myName,esc,enabled:isMyTurn,locked:child.id!==activeSummonId,prefix:'ability',summonName:[child.first_name,child.last_name].filter(Boolean).join(' ')}))));
-  const parentAbilityCards=approvedAbilities.flatMap(a=>abilityVariants(a).map(variant=>abilityCardCombat({ability:a,variant,targets,actorId:state.character.id,actorName:myName,esc,enabled:isMyTurn,prefix:'ability'})));
+  const childAbilityCards=bundle.children.flatMap(({child,abilities})=>abilities.filter(a=>a.status==='approved').flatMap(a=>abilityVariants(a).map(variant=>abilityCardCombat({ability:a,variant,targets,actorId:state.character.id,actorName:myName,esc,enabled:isMyTurn,locked:child.id!==activeSummonId,prefix:'ability',summonName:[child.first_name,child.last_name].filter(Boolean).join(' '),activeCombatMode:mine?.active_combat_mode||null,boostableActions}))));
+  const parentAbilityCards=approvedAbilities.flatMap(a=>abilityVariants(a).map(variant=>abilityCardCombat({ability:a,variant,targets,actorId:state.character.id,actorName:myName,esc,enabled:isMyTurn,prefix:'ability',activeCombatMode:mine?.active_combat_mode||null,boostableActions})));
 
   const usableEquipment=equipment.filter(i=>i.status==='approved'&&(i.equipped||i.category==='consumable'));
   const attackEquipment=usableEquipment.filter(i=>i.equipped&&equipmentDefaults(i).enabled);
@@ -374,7 +405,7 @@ export async function renderPlayerCombatPageV2(ctx) {
 
   root.innerHTML=`${pageHeader(`Rodada ${active.round}`,'Combate')}
     ${turnBanner}<div style="height:14px"></div>
-    <section class="grid grid-2"><div class="card"><h2>${esc(active.name)}</h2>${mine?participantCard(mine,ctx,false,active.active_participant_id,caMap):'<p class="muted">Seu personagem ainda não foi adicionado.</p>'}${mine?`<h3 style="margin-top:12px">Recursos especiais</h3>${specialResourcesHtml(mine,esc,isMyTurn)}<h3 style="margin-top:12px">Efeitos ativos</h3><div>${combatEffectsHtml(effects,state.character.id,esc)}</div>`:''}</div>
+    <section class="grid grid-2"><div class="card"><h2>${esc(active.name)}</h2>${mine?participantCard(mine,ctx,false,active.active_participant_id,caMap):'<p class="muted">Seu personagem ainda não foi adicionado.</p>'}${mine?`<h3 style="margin-top:12px">Recursos especiais</h3>${specialResourcesHtml(mine,esc,isMyTurn)}<h3 style="margin-top:12px">Efeitos ativos</h3><div>${combatEffectsHtml(effects,state.character.id,esc,{ownTurn:isMyTurn,prefix:'player'})}</div>`:''}</div>
     <div class="card"><h2>Golpe corpo a corpo</h2>${mine&&targetOpts&&isMyTurn?`<form id="basic-attack" class="grid"><label>Alvo<select name="target">${targetOpts}</select></label><label style="display:flex;align-items:center;gap:7px"><input name="cursed" type="checkbox" style="width:auto" /> Conduzir +1 EA neste golpe • permite Kokusen em 20 natural</label>${modeFields('')}<div class="notice">1 PA • Força + Lutar • dano 1d6 + Mod. Força</div><button class="btn primary">Atacar</button></form>`:mine&&targetOpts?'<div class="notice">Aguardando o Mestre iniciar seu turno.</div>':'<p class="muted">É preciso estar no combate e possuir um alvo.</p>'}</div></section>
     <div style="height:14px"></div>
     <section class="grid grid-2"><div class="card"><h2>Habilidades</h2><div class="list">${parentAbilityCards.join('')||'<p class="muted">Nenhuma habilidade aprovada.</p>'}</div>${bundle.children.length?`<h3 style="margin-top:14px">Invocações</h3>${bundle.children.map(({child})=>{const activeChild=child.id===activeSummonId;const nm=[child.first_name,child.last_name].filter(Boolean).join(' ');return `<div class="list-item"><div class="btn-row"><div class="title">${esc(nm)}</div><span class="pill ${activeChild?'good':'bad'}">${activeChild?'ATIVA':'INATIVA'}</span>${activeChild&&isMyTurn?`<button class="btn warn" data-dismiss-summon="${child.id}" data-summon-name="${esc(nm)}">Dispensar</button>`:''}</div></div>`}).join('')}<div class="list">${childAbilityCards.join('')}</div>`:''}</div>
@@ -387,10 +418,14 @@ export async function renderPlayerCombatPageV2(ctx) {
     const abilityId=btn.dataset.abilityId; const modeKey=btn.dataset.modeKey||null;
     const a=[...approvedAbilities,...bundle.children.flatMap(x=>x.abilities)].find(x=>x.id===abilityId); if(!a)return;
     const cfg=mergedModeConfig(a,modeKey); const key=`${a.id}:${modeKey||'base'}`;
-    const target=isSelfTarget(cfg)?state.character.id:root.querySelector(`[data-ability-target="${CSS.escape(key)}"]`)?.value;
     const overload=root.querySelector(`[data-overload="${CSS.escape(key)}"]`)?.value||null;
+    const special=cfg.special_action||'';
+    const target=(isSelfTarget(cfg)||['set_combat_mode','boost_recent_attack','place_delayed_bomb'].includes(special))?state.character.id:root.querySelector(`[data-ability-target="${CSS.escape(key)}"]`)?.value;
     const options={};
     if(cfg.special_action==='create_weapon') { options.weapon_profile=root.querySelector(`[data-weapon-profile="${CSS.escape(key)}"]`)?.value||'standard'; options.weapon_attribute=root.querySelector(`[data-weapon-attribute="${CSS.escape(key)}"]`)?.value||'strength'; }
+    const multi=root.querySelector(`[data-ability-targets="${CSS.escape(key)}"]`); if(multi) options.target_ids=[...multi.selectedOptions].map(o=>o.value);
+    const recent=root.querySelector(`[data-recent-action="${CSS.escape(key)}"]`); if(recent?.value) options.action_id=recent.value;
+    const secondary=root.querySelector(`[data-secondary-target="${CSS.escape(key)}"]`); if(secondary?.value) options.secondary_target_id=secondary.value;
     await withBusy(()=>api.useAbilityInCombat({encounterId:active.id,actorCharacterId:state.character.id,abilityId:a.id,targetCharacterId:target,modeKey,overloadKey:overload,options,label:a.name}),'Habilidade usada.');
     renderPlayerCombatPageV2(ctx);
   });
@@ -398,6 +433,8 @@ export async function renderPlayerCombatPageV2(ctx) {
   root.querySelectorAll('[data-dismiss-summon]').forEach(btn=>btn.onclick=async()=>{await withBusy(()=>api.dismissCombatSummon(active.id,state.character.id,btn.dataset.summonName),'Invocação dispensada.');renderPlayerCombatPageV2(ctx);});
   root.querySelectorAll('[data-use-equipment]').forEach(btn=>btn.onclick=async()=>{const i=attackEquipment.find(x=>x.id===btn.dataset.useEquipment);const target=root.querySelector(`[data-equipment-target="${i.id}"]`)?.value;const reinforce=Boolean(root.querySelector(`[data-equipment-reinforce="${i.id}"]`)?.checked);const twoHanded=Boolean(root.querySelector(`[data-equipment-two-hands="${i.id}"]`)?.checked);await withBusy(()=>executeEquipment(i,state.character.id,active.id,target,reinforce,twoHanded),'Ataque realizado.');renderPlayerCombatPageV2(ctx);});
   root.querySelectorAll('[data-equipment-effect-use]').forEach(btn=>btn.onclick=async()=>{const item=usableEquipment.find(x=>x.id===btn.dataset.itemId);const effect=(item?.effects||[]).find(e=>String(e.id)===String(btn.dataset.effectId));if(!item||!effect)return;const modeKey=btn.dataset.modeKey||null;const cfg=effectVariants(effect).find(v=>(v.modeKey||null)===modeKey)?.config||effect.config||{};const key=`${item.id}:${effect.id}:${modeKey||'base'}`;const target=isSelfTarget(cfg)?state.character.id:root.querySelector(`[data-equipment-effect-target="${CSS.escape(key)}"]`)?.value;await withBusy(()=>api.useEquipmentEffectInCombat({encounterId:active.id,actorCharacterId:state.character.id,itemId:item.id,effectId:effect.id,targetCharacterId:target,modeKey,label:`${item.name}: ${effect.name}`}),'Efeito do equipamento usado.');renderPlayerCombatPageV2(ctx);});
+  root.querySelectorAll('[data-extinguish-effect]').forEach(btn=>btn.onclick=async()=>{await withBusy(()=>api.extinguishCombatEffect(active.id,btn.dataset.extinguishEffect,'Apagar efeito'),'Efeito removido.');renderPlayerCombatPageV2(ctx);});
+  root.querySelectorAll('[data-detonate-bomb]').forEach(btn=>btn.onclick=async()=>{if(!confirm('Detonar a Explosão Artística agora? Use este botão no fim da rodada da mesa.'))return;await withBusy(()=>api.detonateArtBomb(active.id,state.character.id),'Explosão Artística detonada.');renderPlayerCombatPageV2(ctx);});
   await bindCommonCombatButtons(root,ctx,active.id,()=>renderPlayerCombatPageV2(ctx));
 }
 export async function renderMasterCombatPageV2(ctx) {
@@ -420,11 +457,12 @@ export async function renderMasterCombatPageV2(ctx) {
   const active=state.activeEncounter;
   ctx.subscribeCombatRealtime?.(active.id,()=>renderMasterCombatPageV2(ctx));
   const participants=await api.getCombatParticipants(active.id);
-  const [targetsRaw,actions,lastUndo,effects]=await Promise.all([
+  const [targetsRaw,actions,lastUndo,effects,boostableActions]=await Promise.all([
     safeCombatRead('alvos do combate',()=>api.getCombatTargets(active.id),null),
     safeCombatRead('histórico de ações',()=>api.getVisibleCombatActions(active.id),[]),
     safeCombatRead('última ação desfazível',()=>api.getLatestCombatUndo(active.id),null),
     safeCombatRead('efeitos temporários',()=>api.getCombatEffects(active.id),[]),
+    safeCombatRead('ataques que podem receber bônus',()=>api.getBoostableCombatActions(active.id),[]),
   ]);
   const targets=Array.isArray(targetsRaw)?targetsRaw:fallbackTargetsFromParticipants(participants);
   state.encounterParticipants=participants;
@@ -440,8 +478,8 @@ export async function renderMasterCombatPageV2(ctx) {
   const approvedAbilities=actorBundle.parentAbilities.filter(a=>a.status==='approved');
   const activeSummonId=activeParticipant?.active_summon_character_id||null;
   const actorAbilityCards=actor?[
-    ...approvedAbilities.flatMap(a=>abilityVariants(a).map(variant=>abilityCardCombat({ability:a,variant,targets,actorId:actor.id,actorName,esc,enabled:true,prefix:'master-ability'}))),
-    ...actorBundle.children.flatMap(({child,abilities})=>abilities.filter(a=>a.status==='approved').flatMap(a=>abilityVariants(a).map(variant=>abilityCardCombat({ability:a,variant,targets,actorId:actor.id,actorName,esc,enabled:true,locked:child.id!==activeSummonId,prefix:'master-ability',summonName:getName(child)}))))
+    ...approvedAbilities.flatMap(a=>abilityVariants(a).map(variant=>abilityCardCombat({ability:a,variant,targets,actorId:actor.id,actorName,esc,enabled:true,prefix:'master-ability',activeCombatMode:activeParticipant?.active_combat_mode||null,boostableActions}))),
+    ...actorBundle.children.flatMap(({child,abilities})=>abilities.filter(a=>a.status==='approved').flatMap(a=>abilityVariants(a).map(variant=>abilityCardCombat({ability:a,variant,targets,actorId:actor.id,actorName,esc,enabled:true,locked:child.id!==activeSummonId,prefix:'master-ability',summonName:getName(child),activeCombatMode:activeParticipant?.active_combat_mode||null,boostableActions}))))
   ]:[];
 
   const usableEquipment=actorEquipment.filter(i=>i.status==='approved'&&(i.equipped||i.category==='consumable'));
@@ -478,10 +516,10 @@ export async function renderMasterCombatPageV2(ctx) {
     <div style="height:14px"></div><section class="card">${turnStatus}</section>
     <div style="height:14px"></div>
     <section class="grid grid-2"><div class="card"><h2>Participantes</h2><div class="list">${participants.map(p=>participantCard(p,ctx,true,active.active_participant_id,caMap)).join('')||'<p class="muted">Vazio.</p>'}</div><h3>Adicionar fichas</h3>${combatEntityPickerHtml(state.masterCharacters,inCombat,esc,getName)}</div>
-    <div class="card"><h2>Ações do turno</h2>${actor?`<div class="list-item"><div class="title">${esc(actorName)}</div>${specialResourcesHtml(activeParticipant,esc,true,'master-resource')}<div style="margin-top:8px">${combatEffectsHtml(effects,actor.id,esc)}</div></div><form id="master-basic" class="grid" style="margin-top:10px"><h3>Golpe corpo a corpo</h3><label>Alvo<select name="target">${hostileTargetOpts}</select></label><label style="display:flex;align-items:center;gap:7px"><input name="cursed" type="checkbox" style="width:auto" /> Conduzir +1 EA</label><button class="btn bad">Atacar em segredo</button></form><hr style="border-color:#333"><form id="master-skill" class="grid"><h3>Teste secreto</h3><label>Perícia<select name="skill">${optionList(SKILLS)}</select></label>${modeFields('')}<button class="btn bad">Rolar em segredo</button></form>`:'<div class="notice">Nenhuma entidade pode realizar ação normal até você iniciar um turno.</div>'}</div></section>
+    <div class="card"><h2>Ações do turno</h2>${actor?`<div class="list-item"><div class="title">${esc(actorName)}</div>${specialResourcesHtml(activeParticipant,esc,true,'master-resource')}<div style="margin-top:8px">${combatEffectsHtml(effects,actor.id,esc,{ownTurn:true,prefix:'master'})}</div></div><form id="master-basic" class="grid" style="margin-top:10px"><h3>Golpe corpo a corpo</h3><label>Alvo<select name="target">${hostileTargetOpts}</select></label><label style="display:flex;align-items:center;gap:7px"><input name="cursed" type="checkbox" style="width:auto" /> Conduzir +1 EA</label><button class="btn bad">Atacar em segredo</button></form><hr style="border-color:#333"><form id="master-skill" class="grid"><h3>Teste secreto</h3><label>Perícia<select name="skill">${optionList(SKILLS)}</select></label>${modeFields('')}<button class="btn bad">Rolar em segredo</button></form>`:'<div class="notice">Nenhuma entidade pode realizar ação normal até você iniciar um turno.</div>'}</div></section>
     ${actor?`<div style="height:14px"></div><section class="grid grid-2"><div class="card"><h2>Habilidades de ${esc(actorName)}</h2><div class="list">${actorAbilityCards.join('')||'<p class="muted">Nenhuma habilidade aprovada.</p>'}</div>${actorBundle.children.length?`<div class="list" style="margin-top:10px">${actorBundle.children.map(({child})=>{const on=child.id===activeSummonId;return `<div class="list-item"><div class="btn-row"><div class="title">${esc(getName(child))}</div><span class="pill ${on?'good':'bad'}">${on?'ATIVA':'INATIVA'}</span>${on?`<button class="btn warn" data-master-dismiss-summon="${child.id}" data-summon-name="${esc(getName(child))}">Dispensar</button>`:''}</div></div>`}).join('')}</div>`:''}</div>
     <div class="card"><h2>Equipamentos de ${esc(actorName)}</h2><div class="list">${attackEquipment.map(i=>{const c=equipmentDefaults(i);const base=weaponDamageProfile(i.weapon_profile||'standard',false);const canTwo=i.weapon_profile==='standard'&&i.equip_slot==='main_hand'&&offHandFree;const temp=i.temporary_encounter_id?`<span class="pill warn">TEMPORÁRIO • ${i.temporary_turns_remaining??'?'} turno(s)</span>`:'';return `<div class="list-item"><div class="btn-row"><div class="title">${esc(i.name)}</div>${temp}</div><div class="meta">${base.paCost} PA • ${base.damageDiceCount}d${base.damageDie}</div><label>Alvo<select data-master-equipment-target="${i.id}">${hostileTargetOpts}</select></label>${canTwo?`<label><input type="checkbox" data-master-equipment-two-hands="${i.id}" style="width:auto" /> Duas mãos • 1d10</label>`:''}${!c.usesCursedEnergy?`<label><input type="checkbox" data-master-equipment-reinforce="${i.id}" style="width:auto" /> Conduzir +1 EA</label>`:''}<button class="btn bad" data-master-use-equipment="${i.id}">Atacar</button></div>`}).join('')||'<p class="muted">Nenhuma arma equipada.</p>'}${effectEquipment.filter(({effect,variant})=>!(effect.type==='reaction'||isReactionConfig(variant.config))).map(({item,effect,variant})=>equipmentEffectCardCombat({item,effect,variant,targets,actorId:actor.id,actorName,esc,enabled:true,prefix:'master-equipment-effect'})).join('')}${passiveEquipment.map(({item,effect})=>`<div class="list-item"><div class="title">${esc(item.name)} • ${esc(effect.name)}</div><span class="pill good">Passivo equipado</span><div class="body">${esc(effect.mechanics||effect.description||'')}</div></div>`).join('')}</div></div></section>`:''}
-    <div style="height:14px"></div><section class="card"><h2>Reações próprias dos participantes</h2><div class="notice">Aqui o Mestre pode acionar habilidades e efeitos de equipamento marcados como reação mesmo que não seja o turno daquele personagem.</div><div class="grid grid-2" style="margin-top:10px">${reactionAbilities.map(({p,name,a,variant,locked,summonName})=>`<div><div class="eyebrow">${esc(name)}</div>${abilityCardCombat({ability:a,variant,targets,actorId:p.character_id,actorName:name,esc,enabled:false,locked,prefix:'master-reaction',summonName})}</div>`).join('')}${reactionEquipment.map(({p,name,item,effect,variant})=>`<div><div class="eyebrow">${esc(name)}</div>${equipmentEffectCardCombat({item,effect,variant,targets,actorId:p.character_id,actorName:name,esc,enabled:false,prefix:'master-reaction-equipment'})}</div>`).join('')||(!reactionAbilities.length?'<p class="muted">Nenhuma reação própria cadastrada.</p>':'')}</div></section>
+    <div style="height:14px"></div><section class="card"><h2>Reações próprias dos participantes</h2><div class="notice">Aqui o Mestre pode acionar habilidades e efeitos de equipamento marcados como reação mesmo que não seja o turno daquele personagem.</div><div class="grid grid-2" style="margin-top:10px">${reactionAbilities.map(({p,name,a,variant,locked,summonName})=>`<div><div class="eyebrow">${esc(name)}</div>${abilityCardCombat({ability:a,variant,targets,actorId:p.character_id,actorName:name,esc,enabled:false,locked,prefix:'master-reaction',summonName,activeCombatMode:p.active_combat_mode||null,boostableActions})}</div>`).join('')}${reactionEquipment.map(({p,name,item,effect,variant})=>`<div><div class="eyebrow">${esc(name)}</div>${equipmentEffectCardCombat({item,effect,variant,targets,actorId:p.character_id,actorName:name,esc,enabled:false,prefix:'master-reaction-equipment'})}</div>`).join('')||(!reactionAbilities.length?'<p class="muted">Nenhuma reação própria cadastrada.</p>':'')}</div></section>
     <div style="height:14px"></div><section class="card"><h2>Ações e reações</h2><div class="list">${actions.map(a=>actionCard(a,ctx)).join('')||'<p class="muted">Nenhuma ação.</p>'}</div></section>`;
 
   root.querySelector('#undo-combat')?.addEventListener('click',async()=>{if(!lastUndo)return;if(!confirm(`Desfazer a última ação do combate?\n\n${lastUndo.label}\n\nTudo que essa ação gastou ou causou será restaurado.`))return;const label=await withBusy(()=>api.undoLastCombatAction(active.id),'Ação desfeita.');toast(`Desfeito: ${label}`,'good');renderMasterCombatPageV2(ctx);});
@@ -491,7 +529,7 @@ export async function renderMasterCombatPageV2(ctx) {
   root.querySelector('#master-basic')?.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.currentTarget);await withBusy(()=>api.createCombatAttack({encounterId:active.id,attackerCharacterId:actor.id,targetCharacterId:f.get('target'),label:'Golpe corpo a corpo',sourceType:'basic',attackAttributeKey:'strength',attackSkillKey:'fight',paCost:1,eaCost:f.get('cursed')==='on'?1:0,usesCursedEnergy:f.get('cursed')==='on',damageDiceCount:1,damageDie:6,damageFlatAttributeKey:'strength'}),'Ataque secreto realizado.');renderMasterCombatPageV2(ctx);});
   root.querySelector('#master-skill')?.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.currentTarget);const skill=SKILL_BY_KEY[f.get('skill')];const result=await withBusy(()=>api.rollGeneralTest({characterId:actor.id,label:skill.name,attributeKey:skill.attribute,skillKey:skill.key,mode:f.get('mode'),count:Number(f.get('count')||2),visibility:'master',encounterId:active.id}));toast(`Rolagem secreta: ${result.total}`,'good');renderMasterCombatPageV2(ctx);});
 
-  const useMasterAbility=async(btn,entryPrefix,actorId)=>{const abilityId=btn.dataset.abilityId;const modeKey=btn.dataset.modeKey||null;const all=[...actorBundle.parentAbilities,...actorBundle.children.flatMap(x=>x.abilities),...reactionAbilities.map(x=>x.a)];const a=all.find(x=>x.id===abilityId);if(!a)return;const cfg=mergedModeConfig(a,modeKey);const key=`${a.id}:${modeKey||'base'}`;const actorCharacter=participants.find(p=>p.character_id===actorId)?.characters;const name=actorCharacter?getName(actorCharacter):'Entidade';const target=isSelfTarget(cfg)?actorId:root.querySelector(`[data-${entryPrefix}-target="${CSS.escape(key)}"]`)?.value;const overload=root.querySelector(`[data-overload="${CSS.escape(key)}"]`)?.value||null;const options={};if(cfg.special_action==='create_weapon'){options.weapon_profile=root.querySelector(`[data-weapon-profile="${CSS.escape(key)}"]`)?.value||'standard';options.weapon_attribute=root.querySelector(`[data-weapon-attribute="${CSS.escape(key)}"]`)?.value||'strength';}await withBusy(()=>api.useAbilityInCombat({encounterId:active.id,actorCharacterId:actorId,abilityId:a.id,targetCharacterId:target,modeKey,overloadKey:overload,options,label:a.name}),`${name}: habilidade usada.`);renderMasterCombatPageV2(ctx);};
+  const useMasterAbility=async(btn,entryPrefix,actorId)=>{const abilityId=btn.dataset.abilityId;const modeKey=btn.dataset.modeKey||null;const all=[...actorBundle.parentAbilities,...actorBundle.children.flatMap(x=>x.abilities),...reactionAbilities.map(x=>x.a)];const a=all.find(x=>x.id===abilityId);if(!a)return;const cfg=mergedModeConfig(a,modeKey);const key=`${a.id}:${modeKey||'base'}`;const actorCharacter=participants.find(p=>p.character_id===actorId)?.characters;const name=actorCharacter?getName(actorCharacter):'Entidade';const special=cfg.special_action||'';const target=(isSelfTarget(cfg)||['set_combat_mode','boost_recent_attack','place_delayed_bomb'].includes(special))?actorId:root.querySelector(`[data-${entryPrefix}-target="${CSS.escape(key)}"]`)?.value;const overload=root.querySelector(`[data-overload="${CSS.escape(key)}"]`)?.value||null;const options={};if(cfg.special_action==='create_weapon'){options.weapon_profile=root.querySelector(`[data-weapon-profile="${CSS.escape(key)}"]`)?.value||'standard';options.weapon_attribute=root.querySelector(`[data-weapon-attribute="${CSS.escape(key)}"]`)?.value||'strength';}const multi=root.querySelector(`[data-${entryPrefix}-targets="${CSS.escape(key)}"]`);if(multi)options.target_ids=[...multi.selectedOptions].map(o=>o.value);const recent=root.querySelector(`[data-recent-action="${CSS.escape(key)}"]`);if(recent?.value)options.action_id=recent.value;const secondary=root.querySelector(`[data-secondary-target="${CSS.escape(key)}"]`);if(secondary?.value)options.secondary_target_id=secondary.value;await withBusy(()=>api.useAbilityInCombat({encounterId:active.id,actorCharacterId:actorId,abilityId:a.id,targetCharacterId:target,modeKey,overloadKey:overload,options,label:a.name}),`${name}: habilidade usada.`);renderMasterCombatPageV2(ctx);};
   root.querySelectorAll('[data-master-ability-use]').forEach(btn=>btn.onclick=()=>useMasterAbility(btn,'master-ability',actor.id));
   root.querySelectorAll('[data-master-reaction-use]').forEach(btn=>{const entry=reactionAbilities.find(x=>x.a.id===btn.dataset.abilityId&&(x.variant.modeKey||'')===(btn.dataset.modeKey||''));btn.onclick=()=>useMasterAbility(btn,'master-reaction',entry.p.character_id);});
   root.querySelectorAll('[data-master-resource-recharge]').forEach(btn=>btn.onclick=async()=>{await withBusy(()=>api.useCombatResourceAction(active.id,actor.id,btn.dataset.masterResourceRecharge,`Recarregar ${btn.dataset.masterResourceRecharge}`),'Recurso recarregado.');renderMasterCombatPageV2(ctx);});
@@ -499,6 +537,8 @@ export async function renderMasterCombatPageV2(ctx) {
   root.querySelectorAll('[data-master-use-equipment]').forEach(btn=>btn.onclick=async()=>{const i=attackEquipment.find(x=>x.id===btn.dataset.masterUseEquipment);const target=root.querySelector(`[data-master-equipment-target="${i.id}"]`)?.value;const reinforce=Boolean(root.querySelector(`[data-master-equipment-reinforce="${i.id}"]`)?.checked);const twoHanded=Boolean(root.querySelector(`[data-master-equipment-two-hands="${i.id}"]`)?.checked);await withBusy(()=>executeEquipment(i,actor.id,active.id,target,reinforce,twoHanded),'Ataque realizado.');renderMasterCombatPageV2(ctx);});
   root.querySelectorAll('[data-master-equipment-effect-use]').forEach(btn=>btn.onclick=async()=>{const item=usableEquipment.find(x=>x.id===btn.dataset.itemId);const effect=(item?.effects||[]).find(e=>String(e.id)===String(btn.dataset.effectId));const modeKey=btn.dataset.modeKey||null;const cfg=effectVariants(effect).find(v=>(v.modeKey||null)===modeKey)?.config||{};const key=`${item.id}:${effect.id}:${modeKey||'base'}`;const target=isSelfTarget(cfg)?actor.id:root.querySelector(`[data-master-equipment-effect-target="${CSS.escape(key)}"]`)?.value;await withBusy(()=>api.useEquipmentEffectInCombat({encounterId:active.id,actorCharacterId:actor.id,itemId:item.id,effectId:effect.id,targetCharacterId:target,modeKey,label:`${item.name}: ${effect.name}`}),'Efeito usado.');renderMasterCombatPageV2(ctx);});
   root.querySelectorAll('[data-master-reaction-equipment-use]').forEach(btn=>btn.onclick=async()=>{const entry=reactionEquipment.find(x=>x.item.id===btn.dataset.itemId&&String(x.effect.id)===String(btn.dataset.effectId)&&(x.variant.modeKey||'')===(btn.dataset.modeKey||''));if(!entry)return;const {p,item,effect,variant}=entry;const key=`${item.id}:${effect.id}:${variant.modeKey||'base'}`;const target=isSelfTarget(variant.config)?p.character_id:root.querySelector(`[data-master-reaction-equipment-target="${CSS.escape(key)}"]`)?.value;await withBusy(()=>api.useEquipmentEffectInCombat({encounterId:active.id,actorCharacterId:p.character_id,itemId:item.id,effectId:effect.id,targetCharacterId:target,modeKey:variant.modeKey,label:`${item.name}: ${effect.name}`}),'Reação usada.');renderMasterCombatPageV2(ctx);});
+  root.querySelectorAll('[data-extinguish-effect]').forEach(btn=>btn.onclick=async()=>{await withBusy(()=>api.extinguishCombatEffect(active.id,btn.dataset.extinguishEffect,'Apagar efeito'),'Efeito removido.');renderMasterCombatPageV2(ctx);});
+  root.querySelectorAll('[data-detonate-bomb]').forEach(btn=>btn.onclick=async()=>{if(!confirm('Detonar a Explosão Artística agora?'))return;await withBusy(()=>api.detonateArtBomb(active.id,btn.dataset.detonateBomb),'Explosão Artística detonada.');renderMasterCombatPageV2(ctx);});
   await bindCommonCombatButtons(root,ctx,active.id,()=>renderMasterCombatPageV2(ctx));
 }
 export function abilityCombatConfigFields() {

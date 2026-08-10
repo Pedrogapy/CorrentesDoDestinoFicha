@@ -203,14 +203,18 @@ async function authenticateMaster(supabase) {
 }
 
 async function findExistingPlayer(supabase, c) {
-  const {data,error}=await supabase.from('characters').select('*').eq('entity_type','player').eq('first_name',c.first_name).eq('last_name',c.last_name||'').limit(2);
+  // Busca todos os players e compara o nome normalizado em JS.
+  // Isso evita que acentos (Antônio/Antonio) impeçam a sincronização.
+  const {data,error}=await supabase.from('characters').select('*').eq('entity_type','player');
   if(error) throw error;
-  if((data||[]).length!==1) {
-    if(!(data||[]).length) throw new Error(`Player ${fullName(c)} não existe. Este script não cria conta/personagem.`);
-    throw new Error(`Há múltiplos players chamados ${fullName(c)}.`);
+  const wanted=normalizeName(fullName(c));
+  const matches=(data||[]).filter(row=>normalizeName(fullName(row))===wanted);
+  if(matches.length!==1) {
+    if(!matches.length) throw new Error(`Player ${fullName(c)} não existe. Este script não cria conta/personagem.`);
+    throw new Error(`Há múltiplos players equivalentes a ${fullName(c)} após normalização do nome.`);
   }
-  if(!data[0].owner_id) throw new Error(`${fullName(c)} existe sem owner_id. Para segurança, a sincronização foi interrompida.`);
-  return data[0];
+  if(!matches[0].owner_id) throw new Error(`${fullName(c)} existe sem owner_id. Para segurança, a sincronização foi interrompida.`);
+  return matches[0];
 }
 
 const CHARACTER_PATCH_KEYS=[
