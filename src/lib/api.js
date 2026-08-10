@@ -121,6 +121,55 @@ export async function createAbility(payload) {
   return data;
 }
 
+
+// ============================================================
+// TÉCNICA DO CORPO AMALDIÇOADO (concessão exclusiva do Mestre)
+// ============================================================
+
+export async function getCursedBodyTechnique(characterId) {
+  const { data, error } = await supabase
+    .from('character_cursed_body_techniques')
+    .select('*')
+    .eq('character_id', characterId)
+    .maybeSingle();
+  if (error) throw error;
+  return data || null;
+}
+
+export async function createCursedBodyTechnique(payload) {
+  const { data, error } = await supabase
+    .from('character_cursed_body_techniques')
+    .insert(payload)
+    .select('*')
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateCursedBodyTechnique(id, patch) {
+  const { data, error } = await supabase
+    .from('character_cursed_body_techniques')
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select('*')
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteCursedBodyTechnique(id) {
+  const { error } = await supabase
+    .from('character_cursed_body_techniques')
+    .delete()
+    .eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteAbility(id) {
+  const { error } = await supabase.from('abilities').delete().eq('id', id);
+  if (error) throw error;
+}
+
 export async function getTrainingTickets(characterId = null) {
   let query = supabase.from('training_tickets').select('*, characters(first_name,last_name)').order('created_at', { ascending: false });
   if (characterId) query = query.eq('character_id', characterId);
@@ -627,6 +676,75 @@ export async function useCombatEffect(payload) {
       p_damage_flat_attribute_key: payload.damageFlatAttributeKey || null,
       p_condition_key: payload.conditionKey || null,
       p_is_reaction: Boolean(payload.isReaction),
+    });
+    if (error) throw error;
+    return data;
+  });
+}
+
+
+// ============================================================
+// MECÂNICAS ESTRUTURADAS DE PLAYER v0.7
+// ============================================================
+
+export async function getCombatEffects(encounterId) {
+  const { data, error } = await supabase
+    .from('combat_effect_states')
+    .select('*')
+    .eq('encounter_id', encounterId)
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function useAbilityInCombat({ encounterId, actorCharacterId, abilityId, targetCharacterId=null, modeKey=null, overloadKey=null, options={}, label='Habilidade' }) {
+  return withCombatUndo(encounterId, `Habilidade: ${label}`, async()=>{
+    const { data, error } = await supabase.rpc('use_ability_in_combat', {
+      p_encounter_id: encounterId,
+      p_actor_character_id: actorCharacterId,
+      p_ability_id: abilityId,
+      p_target_character_id: targetCharacterId || null,
+      p_mode_key: modeKey || null,
+      p_overload_key: overloadKey || null,
+      p_options: options || {},
+    });
+    if (error) throw error;
+    return data;
+  });
+}
+
+export async function useEquipmentEffectInCombat({ encounterId, actorCharacterId, itemId, effectId, targetCharacterId=null, modeKey=null, label='Efeito de equipamento' }) {
+  return withCombatUndo(encounterId, `Equipamento: ${label}`, async()=>{
+    const { data, error } = await supabase.rpc('use_equipment_effect_in_combat', {
+      p_encounter_id: encounterId,
+      p_actor_character_id: actorCharacterId,
+      p_item_id: itemId,
+      p_effect_id: String(effectId),
+      p_target_character_id: targetCharacterId || null,
+      p_mode_key: modeKey || null,
+    });
+    if (error) throw error;
+    return data;
+  });
+}
+
+export async function dismissCombatSummon(encounterId, actorCharacterId, summonName='Invocação') {
+  return withCombatUndo(encounterId, `Dispensar invocação: ${summonName}`, async()=>{
+    const { data, error } = await supabase.rpc('dismiss_combat_summon', {
+      p_encounter_id: encounterId,
+      p_actor_character_id: actorCharacterId,
+    });
+    if (error) throw error;
+    return data;
+  });
+}
+
+export async function useCombatResourceAction(encounterId, actorCharacterId, resourceKey, label='Recurso especial') {
+  return withCombatUndo(encounterId, label, async()=>{
+    const { data, error } = await supabase.rpc('use_combat_resource_action', {
+      p_encounter_id: encounterId,
+      p_actor_character_id: actorCharacterId,
+      p_resource_key: resourceKey,
     });
     if (error) throw error;
     return data;

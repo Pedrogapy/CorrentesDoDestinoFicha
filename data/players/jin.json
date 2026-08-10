@@ -7,8 +7,8 @@
     "grade": "Grau 4",
     "level": 5,
     "technique_name": "Manipulação de Sangue",
-    "technique_description": "Jin manipula o próprio sangue como matéria e meio de condução da Energia Amaldiçoada. No início de um combate ele pode preparar até 3 Coágulos flutuantes, com máximo de 3 ao mesmo tempo. Sangue Perfurante, Sangue Explosivo e Armamento de Sangue consomem 1 Coágulo. Criar 1 novo Coágulo exige 1 PA e custa 1d4 PS. Fluxo das Escamas Vermelhas atua diretamente sobre o corpo e não consome Coágulo. O corpo de Jin também possui o desenvolvimento conhecido como Circuito Hemático, ainda tratado como uma linha própria de evolução corporal.",
-    "notes": "Estilo híbrido: luta de perto e de longe. Recurso especial da Técnica: até 3 Coágulos. O contador de Coágulos ainda é acompanhado manualmente até existir recurso customizado no motor de combate. Jin também possui treinamento inicial com Haruki em barreiras; o progresso oculto continua sob controle do Mestre.",
+    "technique_description": "Jin manipula o próprio sangue como matéria, munição e meio de condução da Energia Amaldiçoada. Ele inicia cada combate com 3 Coágulos e não pode manter mais de 3. Sangue Perfurante, Sangue Explosivo e Armamento de Sangue consomem 1 Coágulo automaticamente. Criar um novo Coágulo custa 1 PA e 1d4 PS. Fluxo das Escamas Vermelhas atua diretamente no corpo e não usa Coágulo.",
+    "notes": "Estilo híbrido, de perto e de longe. O contador de Coágulos é um recurso real do painel de combate. Circuito Hemático continua como linha de desenvolvimento corporal e não foi liberado automaticamente.",
     "attributes": {
       "strength": 2,
       "dexterity": 3,
@@ -58,14 +58,30 @@
     "growth_vigor": 3,
     "growth_reserve": 2,
     "permanent_ps_bonus": 0,
-    "permanent_ea_bonus": 0
+    "permanent_ea_bonus": 0,
+    "special_resources": [
+      {
+        "key": "blood_clot",
+        "name": "Coágulos",
+        "max": 3,
+        "start_combat": 3,
+        "recharge": {
+          "label": "Criar 1 Coágulo",
+          "pa_cost": 1,
+          "ea_cost": 0,
+          "self_damage_dice_count": 1,
+          "self_damage_die": 4,
+          "gain": 1
+        }
+      }
+    ]
   },
   "abilities": [
     {
       "category": "technique",
       "name": "Sangue Perfurante",
       "description": "Jin comprime um Coágulo e o dispara como um jato de sangue de alta pressão capaz de perfurar um alvo à distância.",
-      "mechanics": "Requisito: 1 Coágulo. Custo: 1 PA, 4 EA e 1 Coágulo. Ataque de Controle Amaldiçoado + Canalização contra um alvo Longe. Dano: 2d6 + Mod. Controle Amaldiçoado. O disparo segue uma linha reta. O consumo do Coágulo é acompanhado manualmente por enquanto.",
+      "mechanics": "Requisito: 1 Coágulo. Custo: 1 PA, 4 EA e 1 Coágulo. Ataque de Controle Amaldiçoado + Canalização contra um alvo Longe. Dano: 2d6 + Mod. Controle Amaldiçoado. O disparo segue uma linha reta. O Coágulo é descontado automaticamente do contador de combate.",
       "config": {
         "pa_cost": 1,
         "ea_cost": 4,
@@ -86,7 +102,14 @@
         "damage_flat_attribute_key": "cursed_control",
         "uses_cursed_energy": true,
         "forced_critical": false,
-        "critical_threshold": 20
+        "critical_threshold": 20,
+        "resource_cost": {
+          "key": "blood_clot",
+          "amount": 1
+        },
+        "tags": [
+          "blood_technique"
+        ]
       },
       "vp_estimated": 3,
       "vp_approved": 3,
@@ -96,7 +119,7 @@
       "category": "technique",
       "name": "Sangue Explosivo",
       "description": "Jin expande violentamente um Coágulo em curta distância, transformando o sangue comprimido em uma explosão de pressão amaldiçoada.",
-      "mechanics": "Requisito: 1 Coágulo. Custo: 1 PA, 6 EA e 1 Coágulo. Ataque de Controle Amaldiçoado + Canalização contra um alvo Perto. Dano: 2d6 + Mod. Controle Amaldiçoado. O consumo do Coágulo é acompanhado manualmente por enquanto.",
+      "mechanics": "Requisito: 1 Coágulo. Custo: 1 PA, 6 EA e 1 Coágulo. Ataque de Controle Amaldiçoado + Canalização contra um alvo Perto. Dano: 2d6 + Mod. Controle Amaldiçoado. O Coágulo é descontado automaticamente do contador de combate.",
       "config": {
         "pa_cost": 1,
         "ea_cost": 6,
@@ -117,7 +140,14 @@
         "damage_flat_attribute_key": "cursed_control",
         "uses_cursed_energy": true,
         "forced_critical": false,
-        "critical_threshold": 20
+        "critical_threshold": 20,
+        "resource_cost": {
+          "key": "blood_clot",
+          "amount": 1
+        },
+        "tags": [
+          "blood_technique"
+        ]
       },
       "vp_estimated": 3,
       "vp_approved": 3,
@@ -127,7 +157,7 @@
       "category": "technique",
       "name": "Armamento de Sangue",
       "description": "Jin molda um Coágulo em uma arma corpo a corpo temporária e mantém a forma pela circulação de Energia Amaldiçoada.",
-      "mechanics": "Requisito: 1 Coágulo. Custo: 1 PA, 5 EA e 1 Coágulo. Cria uma arma corpo a corpo por 1d4 + 2 rodadas. A arma usa Lutar para o ataque e pode usar Força ou Destreza conforme sua forma; o dano base usa o perfil físico equivalente aprovado pelo Mestre. Enquanto o motor não cria equipamento temporário automaticamente, a arma é resolvida manualmente a partir deste efeito. O consumo do Coágulo é acompanhado manualmente.",
+      "mechanics": "Requisito: 1 Coágulo. Custo base: 1 PA, 5 EA e 1 Coágulo. Ao usar, Jin escolhe o perfil da arma e se ela usa Força ou Destreza. A arma é criada como equipamento temporário real no inventário por 1d4 + 2 turnos. Custo adicional em PS pelo tamanho: Leve 1 PS; Padrão 1d4 PS; Pesada 1d6 PS; Muito Pesada 1d8 PS. O dano e PA seguem o perfil normal das armas do sistema. Se a mão principal estiver livre, o sistema tenta equipá-la automaticamente.",
       "config": {
         "pa_cost": 1,
         "ea_cost": 5,
@@ -148,7 +178,16 @@
         "damage_flat_attribute_key": null,
         "uses_cursed_energy": true,
         "forced_critical": false,
-        "critical_threshold": 20
+        "critical_threshold": 20,
+        "target_mode": "self",
+        "special_action": "create_weapon",
+        "resource_cost": {
+          "key": "blood_clot",
+          "amount": 1
+        },
+        "tags": [
+          "blood_technique"
+        ]
       },
       "vp_estimated": 2,
       "vp_approved": 2,
@@ -158,7 +197,7 @@
       "category": "transformation",
       "name": "Fluxo das Escamas Vermelhas",
       "description": "Jin força a circulação e a musculatura a entrarem num regime de desempenho extremo, amplificando simultaneamente resposta física e proteção corporal.",
-      "mechanics": "Custo: 1 PA, 6 EA e 1d4 PS. Uso: 1 vez por combate. A duração, em rodadas, é igual ao resultado do 1d4 de PS gasto. Enquanto ativa: +1 CA; uma vez por rodada reduz 1d6 de dano físico recebido; +2 em testes físicos ofensivos. O custo de PS e os bônus temporários são controlados manualmente até o motor possuir transformações estruturadas. Não consome Coágulo.",
+      "mechanics": "Custo: 1 PA, 6 EA e 1d4 PS. Uso: 1 vez por combate. É ativada sobre o próprio Jin, sem escolha de alvo. A duração em turnos é igual ao resultado do 1d4 de PS gasto. Enquanto ativa: +1 CA, +2 em ataques físicos e, uma vez por turno, reduz 1d6 de dano físico recebido. Não consome Coágulo.",
       "config": {
         "pa_cost": 1,
         "ea_cost": 6,
@@ -179,12 +218,128 @@
         "damage_flat_attribute_key": null,
         "uses_cursed_energy": true,
         "forced_critical": false,
-        "critical_threshold": 20
+        "critical_threshold": 20,
+        "target_mode": "self",
+        "self_damage_dice_count": 1,
+        "self_damage_die": 4,
+        "combat_effect": {
+          "key": "red_scale_flow",
+          "name": "Fluxo das Escamas Vermelhas",
+          "duration_from_self_damage": true,
+          "uses": 1,
+          "data": {
+            "ca_bonus": 1,
+            "physical_attack_bonus": 2,
+            "damage_reduction_dice_count": 1,
+            "damage_reduction_die": 6,
+            "applies_to": "physical",
+            "reset_uses": 1,
+            "remove_when_empty": false,
+            "decrement_on": "target_end"
+          }
+        }
       },
       "vp_estimated": 5,
       "vp_approved": 5,
       "limit_override": false
     }
   ],
-  "equipment": []
+  "equipment": [
+    {
+      "name": "Uniforme Okkotsu",
+      "equipment_type": "Roupa / Armadura",
+      "category": "armor",
+      "subtype": "Uniforme amaldiçoado",
+      "is_cursed": true,
+      "grade": "Grau 4",
+      "description": "Uniforme feito por Aventurine para Jin. O tecido absorve sangue próximo ou sangue liberado pelo próprio Jin e o conserva para uso posterior.",
+      "mechanics": "Enquanto equipado, consome 1 Sintonia. O uniforme não cria sangue: seus efeitos pressupõem sangue disponível/armazenado. Munição de Sangue: 1 vez por combate, escolha reduzir em 1 EA a próxima técnica de sangue OU receber +1 no próximo ataque de técnica de sangue. Reposição Vital: 1 vez por combate, recupera 1d4 PS usando sangue armazenado.",
+      "image_url": "",
+      "charges_current": null,
+      "charges_max": null,
+      "active": true,
+      "hands": 0,
+      "weapon_profile": null,
+      "weapon_range": "melee",
+      "wear_slot": "body",
+      "can_hold": false,
+      "attack_config": {
+        "enabled": false
+      },
+      "effects": [
+        {
+          "id": "635a9070-28df-4e99-8e5a-f0953c16e78d",
+          "name": "Munição de Sangue",
+          "type": "active",
+          "description": "O uniforme devolve sangue conservado à técnica no momento certo.",
+          "mechanics": "1 vez por combate. Escolha Economia: -1 EA na próxima técnica de sangue; ou Precisão: +1 no próximo ataque de técnica de sangue. Os dois modos compartilham o mesmo uso.",
+          "vp": 1,
+          "config": {
+            "pa_cost": 0,
+            "ea_cost": 0,
+            "range": "self",
+            "targets": "self",
+            "target_mode": "self",
+            "requires_attack": false,
+            "once_per_combat": true,
+            "usage_scope": "source",
+            "modes": [
+              {
+                "key": "economy",
+                "label": "Economia — próxima técnica de sangue custa -1 EA",
+                "combat_effect": {
+                  "key": "uniform_blood_discount",
+                  "name": "Munição de Sangue — Economia",
+                  "data": {
+                    "ea_discount": 1
+                  }
+                }
+              },
+              {
+                "key": "precision",
+                "label": "Precisão — próximo ataque de sangue recebe +1",
+                "combat_effect": {
+                  "key": "uniform_blood_precision",
+                  "name": "Munição de Sangue — Precisão",
+                  "data": {
+                    "attack_bonus": 1
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "6efb5cd5-8dba-4239-98fd-c7c02c4fe870",
+          "name": "Reposição Vital",
+          "type": "active",
+          "description": "O uniforme devolve sangue armazenado ao corpo de Jin para estabilizá-lo.",
+          "mechanics": "1 vez por combate. Recupera 1d4 PS. Não cria sangue e depende de sangue disponível/armazenado no uniforme.",
+          "vp": 1,
+          "config": {
+            "pa_cost": 0,
+            "ea_cost": 0,
+            "range": "self",
+            "targets": "self",
+            "target_mode": "self",
+            "requires_attack": false,
+            "once_per_combat": true,
+            "healing_dice_count": 1,
+            "healing_die": 4
+          }
+        }
+      ],
+      "vp_limit_override": false,
+      "equip_slot": "body"
+    }
+  ],
+  "cursed_body": {
+    "seed_only": true,
+    "name": "Circuito Hemático",
+    "description": "O corpo de Jin reage em sincronia com a Manipulação de Sangue. Vasos, circulação, músculos e Energia Amaldiçoada podem operar como um segundo sistema técnico, preparando, estabilizando e repondo sangue quando o corpo aprende a acessar essa capacidade.",
+    "master_notes": "Técnica corporal separada da Técnica da alma. NÃO liberar automaticamente. Desenvolvimento registrado: 3 PT suspeita com Yuka; 6 PT confirmação corporal com Akane; 8 PT confirmação energética com Sakura; 12 PT primeira ativação com Yuka + Akane. O Mestre decide quando revelar, quais habilidades o Circuito concede e como elas evoluem.",
+    "is_released": false,
+    "replace_abilities": false,
+    "abilities": []
+  }
 }

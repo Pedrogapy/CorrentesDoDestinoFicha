@@ -136,3 +136,11 @@ Regras canônicas implementadas no site:
 - Jogadores só podem remover condições manualmente durante o próprio turno; o Mestre mantém controle administrativo a qualquer momento.
 - Rolagem de iniciativa continua disponível antes do turno porque é preparação do combate, não uma ação de turno.
 - Realtime da tela V2 foi conectado ao `combatContext`, portanto iniciar/encerrar/desfazer turno atualiza automaticamente a tela do jogador e do Mestre.
+
+## v0.7.1 — Técnicas de Corpo Amaldiçoado
+
+- Técnica do Corpo é uma concessão exclusiva do Mestre e não usa o orçamento normal de slots/VP.
+- A existência do corpo e suas habilidades ficam ocultas por RLS até `is_released=true`.
+- Jogadores não podem criar, editar, mover ou excluir habilidades corporais.
+- Liberar a Técnica do Corpo libera as habilidades atuais; retirar acesso as desabilita novamente.
+- Jin possui `Circuito Hemático` como seed oculto e protegido por `seed_only`, para não sobrescrever progresso futuro do Mestre em reimportações.

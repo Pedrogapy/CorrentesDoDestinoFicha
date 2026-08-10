@@ -202,3 +202,20 @@ label { display:grid; gap:6px; font-size:.83rem; font-weight:750; color:#c8c4cc;
   .equipment-thumb { width:58px; height:58px; }
   .equipment-card .btn-row { gap:6px; }
 }
+
+/* ============================================================
+   Técnicas de Corpo Amaldiçoado v0.7.1
+   ============================================================ */
+.cursed-body-zone {
+  border-color:#7d2833;
+  background:linear-gradient(145deg,rgba(190,30,45,.12),rgba(14,14,18,.98) 42%);
+  box-shadow:inset 4px 0 0 var(--accent);
+}
+.cursed-body-master-zone {
+  border-width:2px;
+  border-color:#8b313a;
+  background:linear-gradient(180deg,rgba(184,31,45,.13),transparent 180px),#0c0c10;
+}
+.cursed-body-master-zone .card {
+  background:#111116;
+}

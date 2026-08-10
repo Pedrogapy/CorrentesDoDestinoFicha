@@ -1,87 +1,67 @@
-# Correntes do Destino — Sincronização das fichas dos players
+# Correntes do Destino — Players e mecânicas v0.7.1
 
-Este pacote preenche **Aiko Takahashi, Jin Okkotsu e Kotone Shiomi** nas contas/personagens que já existem no banco.
+Este pacote corrige e sincroniza **Aiko Takahashi, Kotone Shiomi e Jin Okkotsu** sobre as contas/personagens que já existem no banco.
 
-## O script NÃO faz
+## O que mudou no motor
 
-- não cria conta;
-- não troca senha;
-- não troca `owner_id`;
-- não promove/rebaixa perfil;
-- não apaga personagem;
-- não usa `service_role`.
+- recursos especiais de combate, incluindo Coágulos;
+- habilidades reativas utilizáveis fora do próprio turno;
+- Sobrecargas/modos estruturados;
+- alvo `Próprio` automático, sem seletor inútil;
+- ficha filha de Manifestação com habilidades travadas até a invocação;
+- efeitos temporários estruturados;
+- Armamento de Sangue criando arma temporária real no inventário;
+- Uniforme Okkotsu com efeitos reais;
+- Técnica do Corpo Amaldiçoado criada e controlada exclusivamente pelo Mestre;
+- Técnica do Corpo e habilidades corporais ficam invisíveis até a liberação do Mestre;
+- habilidades corporais são extras de backstory e não consomem slots/VP normais.
 
-Ele autentica como a conta normal do Mestre e deixa RLS/triggers validarem os dados.
+## Aiko
 
-## Antes de aplicar
+- Escudo Temporal, Regeneração Temporal, Ataque Temporal e Interrupção Temporal são habilidades separadas.
+- Escudo Temporal é reação e pode proteger outro personagem fora do turno da Aiko.
+- Escudo Temporal possui Sobrecarga para um segundo impacto.
+- Regeneração Temporal possui Sobrecarga Intensiva.
+- Interrupção Temporal possui execução contra inimigo e execução reativa em aliado.
 
-Não deixe um combate ativo usando habilidades desses players enquanto estiver sincronizando. O script substitui a lista de habilidades de cada player pelas habilidades declaradas nos JSONs para converter o kit antigo de forma limpa.
+## Kotone
 
-## Prévia sem alterar nada
+- Orfeu é uma **ficha filha de Manifestação**.
+- Orfeu não ganha turno independente: ele representa a Persona ativa de Kotone.
+- Agi, Dia, Pancada e Tarukaja pertencem à ficha filha e ficam travados até Orfeu ser manifestado.
+- `Invocar Orfeu` usa alvo Próprio e libera esse conjunto durante o combate.
 
-```powershell
-node .\scripts\apply-players.mjs .\data\players --dry-run
-```
+## Jin
 
-A prévia valida:
-- 20 pontos de Atributo no nível 5;
-- limite 5 por atributo;
-- 14 pontos de Perícia;
-- limite 3 por perícia;
-- 5 pontos de Crescimento;
-- slots e VP das habilidades.
+- entra no combate com **3/3 Coágulos**;
+- recarregar 1 Coágulo custa 1 PA + 1d4 PS;
+- Sangue Perfurante, Sangue Explosivo e Armamento de Sangue descontam 1 Coágulo automaticamente;
+- Fluxo das Escamas Vermelhas é alvo Próprio, sem seletor de alvo;
+- Armamento de Sangue cria arma temporária real e permite escolher Leve/Padrão/Pesada/Muito Pesada;
+- armas maiores custam mais PS para serem moldadas;
+- Uniforme Okkotsu é equipado no Corpo e tem Munição de Sangue + Reposição Vital;
+- Circuito Hemático é preparado no painel do Mestre como **Técnica do Corpo oculta**, sem liberar nada automaticamente.
 
-## Aplicar as três fichas
+## Técnica do Corpo Amaldiçoado
 
-```powershell
-node .\scripts\apply-players.mjs .\data\players
-```
+No painel do Mestre de qualquer personagem existe uma área exclusiva para:
 
-Digite `SIM`, depois entre com a mesma conta de Mestre usada no site.
+1. criar uma Técnica do Corpo;
+2. escrever descrição pública futura e notas privadas;
+3. criar habilidades corporais;
+4. manter tudo oculto;
+5. liberar o pacote ao jogador quando a história justificar;
+6. retirar o acesso novamente se necessário.
 
-## Aplicar apenas uma ficha
+Enquanto oculta, a conta do jogador não consegue ler nem usar a Técnica do Corpo. Quando liberada, ela aparece na aba Habilidades e suas habilidades passam a funcionar no combate.
 
-```powershell
-node .\scripts\apply-players.mjs .\data\players\aiko.json
-node .\scripts\apply-players.mjs .\data\players\jin.json
-node .\scripts\apply-players.mjs .\data\players\kotone.json
-```
+## Ordem de instalação
 
-## Conversões importantes
+1. aplique as migrations v0.7.0 e v0.7.1 com `npx supabase@latest db push`;
+2. rode `node .\scripts\check-system.mjs`;
+3. rode `node .\scripts\check-player-mechanics.mjs`;
+4. rode `node .\scripts\apply-players.mjs .\data\players --dry-run`;
+5. se a prévia estiver correta, rode `node .\scripts\apply-players.mjs .\data\players`;
+6. rode `npm run build` e `npm run dev`.
 
-### Aiko
-- NÃO recebe Dez Sombras.
-- Técnica atual: temporal.
-- Escudo Temporal, Regeneração Temporal e o pacote Ataque/Interrupção Temporal foram organizados nos 3 slots de Técnica do nível 5.
-- Costura do Acaso entra como roupa amaldiçoada Grau 4, Corpo, Sintonia 1.
-
-### Kotone
-- Persona continua sendo a Técnica base.
-- Orfeu entra como **Manifestação**, mas **não recebe ficha filha** porque as Personas dela não possuem PS/PA/turno próprio.
-- Pancada é a ação básica da própria Manifestação Orfeu.
-- Agi, Dia e Tarukaja ocupam os 3 slots de Técnica.
-- Guarda de Alcance I e Teoria de Manifestação I entram como Habilidades Gerais.
-- Lança comum equipada na mão principal.
-- Véu da Fortuna entra como roupa amaldiçoada Grau 4, Corpo, Sintonia 1.
-
-### Jin
-- Manipulação de Sangue usa 3 Coágulos máximos.
-- Sangue Perfurante, Sangue Explosivo e Armamento de Sangue ocupam os 3 slots de Técnica.
-- Fluxo das Escamas Vermelhas entra corretamente como Transformação.
-- Circuito Hemático permanece registrado como desenvolvimento corporal, mas não foi dado como habilidade ativa porque a ativação completa ainda era uma trilha de treinamento, não uma aquisição confirmada.
-- O contador de Coágulos ainda é manual: isso é uma lacuna real do motor atual e deve virar um recurso customizado depois.
-
-## Automação parcial do combate
-
-Ataques simples configurados nos JSONs são executados pelo motor atual.
-
-Alguns efeitos antigos são mais complexos que o motor v0.6.2 e aparecem com a regra completa na ficha, mas exigem resolução manual por enquanto, por exemplo:
-- cura;
-- redução de dano de habilidade reativa;
-- buffs temporários;
-- congelamento temporal;
-- criação de arma temporária;
-- contador de Coágulos;
-- bônus da Transformação.
-
-Isso foi deixado explícito em cada texto para não fingir que o site automatiza algo que ainda não automatiza.
+O importador não troca conta, senha, profile ou `owner_id`.

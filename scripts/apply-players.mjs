@@ -173,6 +173,9 @@ function printPreview(spec) {
     if (arr.length) console.log(`${g}: ${arr.map(a=>`${a.name} [${a.vp_approved??a.vp_estimated} VP]`).join(' | ')}`);
   }
   console.log(`Equipamentos: ${(spec.equipment||[]).map(x=>`${x.name}${x.equip_slot?` [${x.equip_slot}]`:''}`).join(' | ')||'—'}`);
+  if((c.special_resources||[]).length) console.log(`Recursos especiais: ${c.special_resources.map(r=>`${r.name||r.key} ${r.start_combat??r.max}/${r.max}`).join(' | ')}`);
+  if((spec.summons||[]).length) console.log(`Invocações: ${spec.summons.map(x=>`${x.name||x.character?.first_name} (${(x.abilities||[]).length} habilidade(s))`).join(' | ')}`);
+  if(spec.cursed_body) console.log(`Técnica do Corpo: ${spec.cursed_body.name} • ${spec.cursed_body.seed_only?'seed protegido':'sincronizado'} • ${spec.cursed_body.is_released?'liberada':'oculta'}`);
 }
 
 function loadSpecs(target) {
@@ -213,7 +216,7 @@ async function findExistingPlayer(supabase, c) {
 const CHARACTER_PATCH_KEYS=[
   'grade','level','biography','personality','goals','appearance','notes','image_url','image_path',
   'technique_name','technique_description','attributes','skills','growth_vigor','growth_reserve',
-  'permanent_ps_bonus','permanent_ea_bonus'
+  'permanent_ps_bonus','permanent_ea_bonus','special_resources'
 ];
 
 async function updateExistingPlayer(supabase, spec) {
@@ -228,21 +231,152 @@ async function updateExistingPlayer(supabase, spec) {
   return data;
 }
 
-async function syncAbilities(supabase, characterId, spec) {
-  const rows=spec.abilities||[];
-  if(spec.replace_abilities) {
-    const {error}=await supabase.from('abilities').delete().eq('character_id',characterId);
+async function syncAbilities(supabase, characterId, sourceSpec) {
+  const rows=sourceSpec.abilities||[];
+  if(sourceSpec.replace_abilities) {
+    const {error}=await supabase.from('abilities').delete().eq('character_id',characterId).is('cursed_body_technique_id',null);
     if(error) throw error;
   } else if(rows.length) {
     const names=rows.map(x=>x.name);
-    const {error}=await supabase.from('abilities').delete().eq('character_id',characterId).in('name',names);
+    const {error}=await supabase.from('abilities').delete().eq('character_id',characterId).is('cursed_body_technique_id',null).in('name',names);
     if(error) throw error;
   }
   if(!rows.length) return [];
-  const payload=rows.map(row=>({character_id:characterId,...row,status:'approved',master_response:row.master_response||'Convertido e aprovado pelo Mestre para o sistema atual.'}));
+  const payload=rows.map(row=>({
+    character_id:characterId,
+    ...row,
+    status:'approved',
+    master_response:row.master_response||'Convertido e aprovado pelo Mestre para o sistema atual.'
+  }));
   const {data,error}=await supabase.from('abilities').insert(payload).select('*');
   if(error) throw error;
   return data||[];
+}
+
+async function findOrCreateSummon(supabase,parent,summonSpec) {
+  const desiredName=String(summonSpec.name||summonSpec.character?.first_name||'').trim();
+  if(!desiredName) throw new Error(`Invocação sem nome em ${fullName(parent)}.`);
+  const {data:found,error:findError}=await supabase
+    .from('characters').select('*')
+    .eq('parent_character_id',parent.id)
+    .eq('entity_type','summon')
+    .eq('first_name',desiredName)
+    .limit(2);
+  if(findError) throw findError;
+  let child;
+  if((found||[]).length>1) throw new Error(`Existem múltiplas fichas filhas chamadas ${desiredName}.`);
+  if((found||[]).length===1) child=found[0];
+  else {
+    const {data,error}=await supabase.rpc('create_summon_sheet',{p_parent_id:parent.id,p_name:desiredName});
+    if(error) throw error;
+    child=data;
+    console.log(`  Ficha filha criada: ${desiredName}`);
+  }
+
+  const source=summonSpec.character||{};
+  const patch={updated_at:new Date().toISOString()};
+  for(const k of [
+    'first_name','last_name','nickname','grade','level','biography','personality','goals','appearance','notes','image_url','image_path',
+    'technique_name','technique_description','attributes','skills','growth_vigor','growth_reserve','permanent_ps_bonus','permanent_ea_bonus','special_resources'
+  ]) if(Object.hasOwn(source,k)) patch[k]=source[k];
+  patch.entity_type='summon';
+  const {data:updated,error:updateError}=await supabase.from('characters').update(patch).eq('id',child.id).select('*').single();
+  if(updateError) throw updateError;
+  return updated;
+}
+
+async function syncSummons(supabase,parent,spec) {
+  const map=new Map();
+  const summaries=[];
+  for(const summonSpec of spec.summons||[]) {
+    const child=await findOrCreateSummon(supabase,parent,summonSpec);
+    const key=String(summonSpec.key||child.first_name).trim();
+    const abilities=await syncAbilities(supabase,child.id,{
+      abilities:summonSpec.abilities||[],
+      replace_abilities:summonSpec.replace_abilities!==false,
+    });
+    map.set(key,child);
+    summaries.push({key,child,abilities});
+    console.log(`  Invocação sincronizada: ${fullName(child)} • ${abilities.length} habilidade(s)`);
+  }
+  return {map,summaries};
+}
+
+function bindSummonIds(spec,summonMap) {
+  return {
+    ...spec,
+    abilities:(spec.abilities||[]).map(row=>{
+      const out=structuredClone(row);
+      const key=out.config?.summon_key;
+      if(key) {
+        const child=summonMap.get(String(key));
+        if(!child) throw new Error(`${row.name}: summon_key '${key}' não foi encontrado em summons.`);
+        out.config={...out.config,summon_character_id:child.id};
+      }
+      return out;
+    })
+  };
+}
+
+async function syncCursedBody(supabase, character, spec) {
+  const source=spec.cursed_body;
+  if(!source) return null;
+
+  const {data:existing,error:findError}=await supabase
+    .from('character_cursed_body_techniques')
+    .select('*')
+    .eq('character_id',character.id)
+    .maybeSingle();
+  if(findError) throw findError;
+
+  // seed_only existe para não apagar progresso do Mestre em reimportações futuras.
+  if(existing && source.seed_only) {
+    console.log(`  Técnica do Corpo preservada: ${existing.name} • ${existing.is_released?'liberada':'oculta'}`);
+    return existing;
+  }
+
+  let body=existing;
+  if(!body) {
+    const {data,error}=await supabase.from('character_cursed_body_techniques').insert({
+      character_id:character.id,
+      name:source.name,
+      description:source.description||'',
+      master_notes:source.master_notes||'',
+      is_released:Boolean(source.is_released),
+    }).select('*').single();
+    if(error) throw error;
+    body=data;
+    console.log(`  Técnica do Corpo criada: ${body.name} • ${body.is_released?'liberada':'oculta'}`);
+  } else {
+    const {data,error}=await supabase.from('character_cursed_body_techniques').update({
+      name:source.name||body.name,
+      description:source.description??body.description,
+      master_notes:source.master_notes??body.master_notes,
+      is_released:Object.hasOwn(source,'is_released')?Boolean(source.is_released):body.is_released,
+      updated_at:new Date().toISOString(),
+    }).eq('id',body.id).select('*').single();
+    if(error) throw error;
+    body=data;
+  }
+
+  if(Array.isArray(source.abilities)) {
+    if(source.replace_abilities!==false) {
+      const {error}=await supabase.from('abilities').delete().eq('cursed_body_technique_id',body.id);
+      if(error) throw error;
+    }
+    if(source.abilities.length) {
+      const payload=source.abilities.map(row=>({
+        character_id:character.id,
+        cursed_body_technique_id:body.id,
+        ...row,
+        status:body.is_released?'approved':'disabled',
+        master_response:body.is_released?'Concedida pelo Mestre através da Técnica do Corpo.':'Oculta até o Mestre liberar a Técnica do Corpo.',
+      }));
+      const {error}=await supabase.from('abilities').insert(payload);
+      if(error) throw error;
+    }
+  }
+  return body;
 }
 
 async function syncEquipment(supabase, characterId, items) {
@@ -270,12 +404,15 @@ async function syncEquipment(supabase, characterId, items) {
 
 async function applyOne(supabase, spec) {
   const character=await updateExistingPlayer(supabase,spec);
-  const abilities=await syncAbilities(supabase,character.id,spec);
+  const cursedBody=await syncCursedBody(supabase,character,spec);
+  const summons=await syncSummons(supabase,character,spec);
+  const boundSpec=bindSummonIds(spec,summons.map);
+  const abilities=await syncAbilities(supabase,character.id,boundSpec);
   const equipment=await syncEquipment(supabase,character.id,spec.equipment||[]);
   const d=derived(character);
-  console.log(`  Habilidades: ${abilities.length} • Equipamentos sincronizados: ${equipment.length}`);
+  console.log(`  Habilidades: ${abilities.length} • Invocações: ${summons.summaries.length} • Equipamentos sincronizados: ${equipment.length}${cursedBody?' • Técnica do Corpo configurada':''}`);
   console.log(`  Resultado: PS ${d.ps} • EA ${d.ea} • PA ${d.pa} • CA ${d.ca}`);
-  return {character,abilities,equipment};
+  return {character,abilities,equipment,summons:summons.summaries,cursedBody};
 }
 
 async function main() {

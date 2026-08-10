@@ -522,7 +522,15 @@ function renderSystemPage() {
 async function renderAbilitiesPage() {
   const root=document.querySelector('#page');
   root.innerHTML=`${pageHeader('Construção e aprovação', 'Habilidades')}<div class="card">Carregando...</div>`;
-  const [abilities, childSheets]=await Promise.all([api.getAbilities(state.character.id), api.getChildSheets(state.character.id)]);
+  const [abilities, childSheets, cursedBody]=await Promise.all([
+    api.getAbilities(state.character.id),
+    api.getChildSheets(state.character.id),
+    api.getCursedBodyTechnique(state.character.id),
+  ]);
+  const normalAbilities=abilities.filter(a=>!a.cursed_body_technique_id);
+  const cursedBodyAbilities=abilities.filter(a=>a.cursed_body_technique_id && cursedBody && a.cursed_body_technique_id===cursedBody.id);
+  const childAbilityPairs=await Promise.all(childSheets.map(async child=>({child,abilities:await api.getAbilities(child.id)})));
+  const childAbilityMap=Object.fromEntries(childAbilityPairs.map(x=>[x.child.id,x.abilities]));
   const budget=slotBudget(state.character.level);
   root.innerHTML=`
     ${pageHeader('Construção e aprovação', 'Habilidades')}
@@ -555,17 +563,18 @@ async function renderAbilitiesPage() {
       </div>
     </section>
     <div style="height:14px"></div>
-    <section class="card"><h2>Minhas habilidades</h2><div class="list">${abilities.length?abilities.map(a=>abilityCard(a)).join(''):'<p class="muted">Nenhuma habilidade enviada ainda.</p>'}</div></section>
+    <section class="card"><h2>Minhas habilidades</h2><div class="list">${normalAbilities.length?normalAbilities.map(a=>abilityCard(a)).join(''):'<p class="muted">Nenhuma habilidade enviada ainda.</p>'}</div></section>
+    ${cursedBody?`<div style="height:14px"></div><section class="card cursed-body-zone"><div class="btn-row"><div><div class="eyebrow">CONCESSÃO DO MESTRE</div><h2 style="margin:4px 0">Técnica do Corpo · ${esc(cursedBody.name)}</h2></div><span class="pill good">LIBERADA</span></div><div class="body">${esc(cursedBody.description||'Esta Técnica do Corpo foi liberada pelo Mestre.')}</div><div class="notice" style="margin-top:10px">Técnicas e habilidades do Corpo Amaldiçoado são extras narrativos concedidos pelo Mestre. Elas não consomem os slots ou VP normais da sua build e não podem ser editadas pelo jogador.</div><h3 style="margin-top:14px">Habilidades do Corpo</h3><div class="list">${cursedBodyAbilities.length?cursedBodyAbilities.map(a=>abilityCard(a)).join(''):'<p class="muted">A Técnica do Corpo foi revelada, mas ainda não possui habilidades liberadas.</p>'}</div></section>`:''}
     <div style="height:14px"></div>
     <section class="grid grid-2"><div class="card"><h2>Fichas filhas de invocação</h2><p class="muted">Uma ficha filha pode ser criada quando existe ao menos uma Manifestação aprovada.</p><form id="summon-form" class="field-row"><label>Nome da invocação<input name="name" required /></label><button class="btn primary" style="align-self:end">Criar ficha filha</button></form></div><div class="card"><h2>Invocações</h2><div class="list">${childSheets.length?childSheets.map(c=>`<button class="list-item" style="text-align:left;color:inherit;width:100%" data-select-summon="${c.id}"><div class="title">${esc(getName(c))}</div><div class="meta">Nv ${c.level}</div></button>`).join(''):'<p class="muted">Nenhuma ficha filha.</p>'}</div></div></section>
-    ${state.summonSelected?`<div style="height:14px"></div><section id="summon-editor"></section>`:''}`;
+    ${state.summonSelected?`<div style="height:14px"></div><section class="card"><div class="btn-row"><h2 style="margin:0">Habilidades de ${esc(getName(state.summonSelected))}</h2><span class="pill">Ficha filha</span></div><div class="notice" style="margin-top:8px">Estas habilidades pertencem à invocação e podem ser travadas no combate até a manifestação correspondente estar ativa.</div><div class="list" style="margin-top:10px">${(childAbilityMap[state.summonSelected.id]||[]).length?(childAbilityMap[state.summonSelected.id]||[]).map(a=>abilityCard(a)).join(''):'<p class="muted">Nenhuma habilidade cadastrada nesta ficha filha.</p>'}</div></section><div style="height:14px"></div><section id="summon-editor"></section>`:''}`;
 
   const form=root.querySelector('#ability-form');
   const getConfig=()=>{
     const f=new FormData(form);
     return {
       pa_cost:Number(f.get('pa')||0), ea_cost:Number(f.get('ea')||0), damage_die:Number(f.get('die')||0), damage_dice_count:Number(f.get('diceCount')||0),
-      range:f.get('range'), targets:f.get('targets'), duration:f.get('duration'), condition_severity:f.get('condition'), condition_key:f.get('conditionKey')||null, once_per_combat:f.get('onceCombat')==='on', once_per_mission:f.get('onceMission')==='on', requires_preparation:f.get('preparation')==='on', meaningful_drawback:f.get('drawback')==='on', requires_attack:f.get('requiresAttack')==='on', attack_attribute_key:f.get('attackAttribute'), attack_skill_key:f.get('attackSkill'), damage_flat_attribute_key:f.get('damageFlatAttribute')||null, uses_cursed_energy:f.get('usesCursedEnergy')==='on', forced_critical:f.get('forcedCritical')==='on', critical_threshold:Number(f.get('criticalThreshold')||20),
+      range:f.get('range'), targets:f.get('targets'), duration:f.get('duration'), condition_severity:f.get('condition'), condition_key:f.get('conditionKey')||null, once_per_combat:f.get('onceCombat')==='on', once_per_mission:f.get('onceMission')==='on', requires_preparation:f.get('preparation')==='on', meaningful_drawback:f.get('drawback')==='on', requires_attack:f.get('requiresAttack')==='on', is_reaction:f.get('isReaction')==='on', attack_attribute_key:f.get('attackAttribute'), attack_skill_key:f.get('attackSkill'), damage_flat_attribute_key:f.get('damageFlatAttribute')||null, uses_cursed_energy:f.get('usesCursedEnergy')==='on', forced_critical:f.get('forcedCritical')==='on', critical_threshold:Number(f.get('criticalThreshold')||20),
     };
   };
   const updateVp=()=>root.querySelector('#vp-preview').textContent=`VP estimado: ${estimateAbilityVP(getConfig())}`;
@@ -585,7 +594,8 @@ async function renderAbilitiesPage() {
 
 function abilityCard(a, master=false) {
   const statusClass=a.status==='approved'?'good':a.status==='rejected'?'bad':'warn';
-  return `<div class="list-item" data-ability-id="${a.id}"><div class="btn-row"><div class="title">${esc(a.name)}</div><span class="pill ${statusClass}">${esc(a.status)}</span><span class="pill">VP ${a.vp_approved??a.vp_estimated}</span></div><div class="meta">${esc(ABILITY_CATEGORIES.find(c=>c.key===a.category)?.name||a.category)} ${a.config?.condition_key?`• <button class="btn ghost" data-condition-key="${esc(a.config.condition_key)}">Ver condição</button>`:''}</div><div class="body">${esc(a.description)}${a.mechanics?`\n\n${esc(a.mechanics)}`:''}</div>${a.master_response?`<div class="notice" style="margin-top:8px">Mestre: ${esc(a.master_response)}</div>`:''}${master&&a.status==='pending'?`<div class="btn-row" style="margin-top:9px"><button class="btn good" data-approve-ability="${a.id}">Aprovar</button><button class="btn bad" data-reject-ability="${a.id}">Rejeitar</button></div>`:''}</div>`;
+  const bodyPill=a.cursed_body_technique_id?'<span class="pill bad">CORPO AMALDIÇOADO</span>':'';
+  return `<div class="list-item" data-ability-id="${a.id}"><div class="btn-row"><div class="title">${esc(a.name)}</div>${bodyPill}<span class="pill ${statusClass}">${esc(a.status)}</span><span class="pill">VP ${a.vp_approved??a.vp_estimated}</span></div><div class="meta">${esc(ABILITY_CATEGORIES.find(c=>c.key===a.category)?.name||a.category)} ${a.config?.condition_key?`• <button class="btn ghost" data-condition-key="${esc(a.config.condition_key)}">Ver condição</button>`:''}</div><div class="body">${esc(a.description)}${a.mechanics?`\n\n${esc(a.mechanics)}`:''}</div>${a.master_response?`<div class="notice" style="margin-top:8px">Mestre: ${esc(a.master_response)}</div>`:''}${master&&a.status==='pending'?`<div class="btn-row" style="margin-top:9px"><button class="btn good" data-approve-ability="${a.id}">Aprovar</button><button class="btn bad" data-reject-ability="${a.id}">Rejeitar</button></div>`:''}</div>`;
 }
 
 async function renderTrainingPage() {
@@ -686,12 +696,71 @@ async function renderMasterPage() {
 }
 
 async function renderMasterSecret(root,character){
-  const [secret,tracks,abilities]=await Promise.all([
+  const [secret,tracks,abilities,cursedBody]=await Promise.all([
     api.getMasterSecret(character.id),
     api.listMasterProgress(character.id),
     api.getAbilities(character.id),
+    api.getCursedBodyTechnique(character.id),
   ]);
+  const normalAbilities=abilities.filter(a=>!a.cursed_body_technique_id);
+  const cursedBodyAbilities=cursedBody?abilities.filter(a=>a.cursed_body_technique_id===cursedBody.id):[];
   const budgets=slotBudget(character.level);
+
+  const cursedBodyHtml=!cursedBody?`
+    <div style="height:14px"></div>
+    <div class="master-zone cursed-body-master-zone">
+      <div class="btn-row"><div><div class="eyebrow">EXCLUSIVO DO MESTRE</div><h2 style="margin:4px 0">Corpo Amaldiçoado</h2></div><span class="pill bad">NÃO CONFIGURADO</span></div>
+      <div class="notice">Use isto somente quando a história do personagem conceder uma <strong>Técnica do Corpo</strong> separada da Técnica Amaldiçoada normal. O jogador não saberá que ela existe até você liberar o acesso.</div>
+      <form id="cursed-body-create-form" class="card grid" style="margin-top:10px">
+        <label>Nome da Técnica do Corpo<input name="name" required placeholder="Ex.: Circuito Hemático" /></label>
+        <label>Descrição que o jogador verá quando for liberada<textarea name="description"></textarea></label>
+        <label>Notas exclusivas do Mestre<textarea name="masterNotes" placeholder="Origem, gatilhos narrativos, plano de evolução..."></textarea></label>
+        <button class="btn bad">Criar Técnica do Corpo oculta</button>
+      </form>
+    </div>`:`
+    <div style="height:14px"></div>
+    <div class="master-zone cursed-body-master-zone">
+      <div class="btn-row"><div><div class="eyebrow">EXCLUSIVO DO MESTRE · BACKSTORY</div><h2 style="margin:4px 0">Técnica do Corpo · ${esc(cursedBody.name)}</h2></div><span class="pill ${cursedBody.is_released?'good':'bad'}">${cursedBody.is_released?'LIBERADA':'OCULTA'}</span></div>
+      <div class="notice">Esta Técnica do Corpo e suas habilidades são <strong>extras concedidos pelo Mestre</strong>. Não gastam slots nem VP da build normal. Enquanto estiver oculta, o jogador não consegue vê-la nem usar suas habilidades.</div>
+      <div class="grid grid-2" style="margin-top:10px">
+        <form id="cursed-body-edit-form" class="card grid">
+          <label>Nome<input name="name" required value="${esc(cursedBody.name)}" /></label>
+          <label>Descrição para o jogador<textarea name="description">${esc(cursedBody.description||'')}</textarea></label>
+          <label>Notas exclusivas do Mestre<textarea name="masterNotes">${esc(cursedBody.master_notes||'')}</textarea></label>
+          <button class="btn">Salvar Técnica do Corpo</button>
+          <div class="btn-row">
+            <button type="button" class="btn ${cursedBody.is_released?'warn':'good'}" id="toggle-cursed-body">${cursedBody.is_released?'Retirar acesso do jogador':'Liberar técnica + habilidades'}</button>
+            <button type="button" class="btn bad" id="delete-cursed-body">Excluir Técnica do Corpo</button>
+          </div>
+        </form>
+        <div class="card">
+          <h3>Estado de acesso</h3>
+          <div class="list-item"><div class="title">${cursedBody.is_released?'O jogador tem acesso':'Somente o Mestre vê'}</div><div class="body">${cursedBody.is_released?'A Técnica do Corpo aparece na aba Habilidades e suas habilidades aprovadas entram normalmente no combate.':'A técnica, descrição e habilidades ficam completamente ocultas para a conta do jogador.'}</div></div>
+          <div class="list-item"><div class="title">Capacidade separada</div><div class="body">Habilidades corporais não contam contra os limites normais de Técnica, Habilidade Geral, Manifestação ou Transformação. O VP continua visível como referência de equilíbrio para o Mestre.</div></div>
+        </div>
+      </div>
+      <div class="grid grid-2" style="margin-top:10px">
+        <form id="cursed-body-ability-form" class="card grid">
+          <h3>Nova habilidade do Corpo</h3>
+          <label>Categoria<select name="category">${ABILITY_CATEGORIES.filter(c=>c.key!=='domain').map(c=>`<option value="${c.key}">${c.name}</option>`).join('')}</select></label>
+          <label>Nome<input name="name" required /></label>
+          <label>Descrição<textarea name="description"></textarea></label>
+          <label>Mecânica<textarea name="mechanics"></textarea></label>
+          <div class="field-row-3"><label>PA<input name="pa" type="number" min="0" max="7" value="1" /></label><label>EA<input name="ea" type="number" min="0" value="2" /></label><label>Dado<select name="die"><option value="0">Sem dano</option>${[4,6,8,10,12,20].map(v=>`<option value="${v}">d${v}</option>`).join('')}</select></label></div>
+          <div class="field-row-3"><label>Qtd. dados<input name="diceCount" type="number" min="0" max="12" value="0" /></label><label>Alcance<select name="range">${Object.entries(VP_OPTIONS.range).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')}</select></label><label>Alvos<select name="targets">${Object.entries(VP_OPTIONS.targets).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')}</select></label></div>
+          <div class="field-row"><label>Duração<select name="duration">${Object.entries(VP_OPTIONS.duration).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')}</select></label><label>Condição<select name="condition">${Object.entries(VP_OPTIONS.conditionSeverity).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')}</select></label></div>
+          <label>Condição do compêndio<select name="conditionKey"><option value="">Nenhuma</option>${state.conditions.map(c=>`<option value="${c.key}">${esc(c.name)}</option>`).join('')}</select></label>
+          <div class="field-row"><label><input name="onceCombat" type="checkbox" style="width:auto" /> 1x combate</label><label><input name="onceMission" type="checkbox" style="width:auto" /> 1x missão</label></div>
+          <div class="field-row"><label><input name="preparation" type="checkbox" style="width:auto" /> Exige preparação</label><label><input name="drawback" type="checkbox" style="width:auto" /> Desvantagem relevante</label></div>
+          ${abilityCombatConfigFields()}
+          <div class="notice" id="cursed-body-vp-preview">VP de referência: 1</div>
+          <label>VP definido pelo Mestre<input name="vpApproved" type="number" min="1" value="1" /></label>
+          <button class="btn bad">Adicionar habilidade do Corpo</button>
+        </form>
+        <div class="card"><h3>Habilidades do Corpo</h3><div class="list">${cursedBodyAbilities.length?cursedBodyAbilities.map(a=>`<div>${abilityCard(a)}<button class="btn bad" data-delete-body-ability="${a.id}" style="margin:6px 0 10px">Excluir habilidade do Corpo</button></div>`).join(''):'<p class="muted">Nenhuma habilidade corporal criada.</p>'}</div></div>
+      </div>
+    </div>`;
+
   root.innerHTML=`<div style="height:14px"></div>
     <div class="secret-box"><h2>Informações exclusivas do mestre</h2><label>Segredos<textarea id="secret-text">${esc(secret?.secret_text||'')}</textarea></label><button class="btn bad" id="save-secret" style="margin-top:8px">Salvar segredo</button>
     <h3>Progressos ocultos</h3><div class="list">${tracks.map(t=>`<div class="list-item"><div class="title">${esc(t.title)}</div><div class="meta">${t.current_points}${t.target_points!=null?` / ${t.target_points}`:''}</div><div class="body">${esc(t.master_notes||'')}</div></div>`).join('')||'<p class="muted">Nenhum progresso oculto.</p>'}</div>
@@ -716,9 +785,11 @@ async function renderMasterSecret(root,character){
           <label><input name="override" type="checkbox" style="width:auto" /> Ignorar limite normal (somente exceção narrativa do mestre)</label>
           <button class="btn primary">Criar habilidade aprovada</button>
         </form>
-        <div class="card"><h3>Orçamentos no nível ${character.level}</h3>${['technique','general','manifestation','transformation'].map(k=>`<div class="list-item"><div class="title">${ABILITY_CATEGORIES.find(c=>c.key===k)?.name}</div><div class="meta">${budgets[k].slots} slots • ${budgets[k].vp} VP • máx. individual ${budgets[k].maxSingle}</div></div>`).join('')}<h3>Existentes</h3><div class="list">${abilities.length?abilities.map(a=>abilityCard(a)).join(''):'<p class="muted">Nenhuma habilidade.</p>'}</div></div>
+        <div class="card"><h3>Orçamentos no nível ${character.level}</h3>${['technique','general','manifestation','transformation'].map(k=>`<div class="list-item"><div class="title">${ABILITY_CATEGORIES.find(c=>c.key===k)?.name}</div><div class="meta">${budgets[k].slots} slots • ${budgets[k].vp} VP • máx. individual ${budgets[k].maxSingle}</div></div>`).join('')}<h3>Existentes</h3><div class="list">${normalAbilities.length?normalAbilities.map(a=>abilityCard(a)).join(''):'<p class="muted">Nenhuma habilidade.</p>'}</div></div>
       </div>
     </div>
+
+    ${cursedBodyHtml}
 
     <div style="height:14px"></div>
     <div id="master-equipment-manager"></div>`;
@@ -727,15 +798,33 @@ async function renderMasterSecret(root,character){
   root.querySelector('#track-form').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);await withBusy(()=>api.upsertMasterProgress({character_id:character.id,key:f.get('key'),title:f.get('title'),current_points:Number(f.get('current')||0),target_points:f.get('target')===''?null:Number(f.get('target')),master_notes:f.get('notes'),reward_notes:f.get('reward')}),'Progresso oculto salvo.');renderMasterSecret(root,character);};
 
   const abilityForm=root.querySelector('#master-ability-form');
-  const configFromMasterAbility=()=>{const f=new FormData(abilityForm);return {pa_cost:Number(f.get('pa')||0),ea_cost:Number(f.get('ea')||0),damage_die:Number(f.get('die')||0),damage_dice_count:Number(f.get('diceCount')||0),range:f.get('range'),targets:f.get('targets'),duration:f.get('duration'),condition_severity:f.get('condition'),condition_key:f.get('conditionKey')||null,once_per_combat:f.get('onceCombat')==='on',once_per_mission:f.get('onceMission')==='on',requires_attack:f.get('requiresAttack')==='on',attack_attribute_key:f.get('attackAttribute'),attack_skill_key:f.get('attackSkill'),damage_flat_attribute_key:f.get('damageFlatAttribute')||null,uses_cursed_energy:f.get('usesCursedEnergy')==='on',forced_critical:f.get('forcedCritical')==='on',critical_threshold:Number(f.get('criticalThreshold')||20)};};
+  const configFromMasterAbility=()=>{const f=new FormData(abilityForm);return {pa_cost:Number(f.get('pa')||0),ea_cost:Number(f.get('ea')||0),damage_die:Number(f.get('die')||0),damage_dice_count:Number(f.get('diceCount')||0),range:f.get('range'),targets:f.get('targets'),duration:f.get('duration'),condition_severity:f.get('condition'),condition_key:f.get('conditionKey')||null,once_per_combat:f.get('onceCombat')==='on',once_per_mission:f.get('onceMission')==='on',requires_attack:f.get('requiresAttack')==='on',is_reaction:f.get('isReaction')==='on',attack_attribute_key:f.get('attackAttribute'),attack_skill_key:f.get('attackSkill'),damage_flat_attribute_key:f.get('damageFlatAttribute')||null,uses_cursed_energy:f.get('usesCursedEnergy')==='on',forced_critical:f.get('forcedCritical')==='on',critical_threshold:Number(f.get('criticalThreshold')||20)};};
   const updateMasterVp=()=>{const vp=estimateAbilityVP(configFromMasterAbility());root.querySelector('#master-vp-preview').textContent=`VP estimado: ${vp}`;const field=abilityForm.elements.vpApproved;if(!field.dataset.touched)field.value=vp;};
   abilityForm.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',()=>{if(el.name==='vpApproved')el.dataset.touched='1';updateMasterVp();}));
   updateMasterVp();
   abilityForm.onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);const config=configFromMasterAbility();const estimated=estimateAbilityVP(config);await withBusy(()=>api.createAbility({character_id:character.id,category:f.get('category'),name:f.get('name'),description:f.get('description'),mechanics:f.get('mechanics'),config,vp_estimated:estimated,vp_approved:Number(f.get('vpApproved')||estimated),limit_override:f.get('override')==='on',status:'approved'}),'Habilidade criada.');renderMasterSecret(root,character);};
+
+  const createBodyForm=root.querySelector('#cursed-body-create-form');
+  if(createBodyForm) createBodyForm.onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);await withBusy(()=>api.createCursedBodyTechnique({character_id:character.id,name:String(f.get('name')).trim(),description:f.get('description')||'',master_notes:f.get('masterNotes')||'',is_released:false}),'Técnica do Corpo criada e mantida oculta.');renderMasterSecret(root,character);};
+
+  if(cursedBody){
+    const bodyEdit=root.querySelector('#cursed-body-edit-form');
+    bodyEdit.onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);await withBusy(()=>api.updateCursedBodyTechnique(cursedBody.id,{name:String(f.get('name')).trim(),description:f.get('description')||'',master_notes:f.get('masterNotes')||''}),'Técnica do Corpo atualizada.');renderMasterSecret(root,character);};
+    root.querySelector('#toggle-cursed-body').onclick=async()=>{const releasing=!cursedBody.is_released;const msg=releasing?'Liberar esta Técnica do Corpo e todas as habilidades atuais para o jogador?':'Retirar o acesso do jogador? As habilidades do Corpo deixarão de poder ser usadas.';if(!confirm(msg))return;await withBusy(()=>api.updateCursedBodyTechnique(cursedBody.id,{is_released:releasing}),releasing?'Técnica do Corpo liberada.':'Acesso à Técnica do Corpo retirado.');renderMasterSecret(root,character);};
+    root.querySelector('#delete-cursed-body').onclick=async()=>{if(!confirm(`Excluir definitivamente a Técnica do Corpo "${cursedBody.name}" e todas as habilidades ligadas a ela?`))return;await withBusy(()=>api.deleteCursedBodyTechnique(cursedBody.id),'Técnica do Corpo excluída.');renderMasterSecret(root,character);};
+
+    const bodyAbilityForm=root.querySelector('#cursed-body-ability-form');
+    const bodyAbilityConfig=()=>{const f=new FormData(bodyAbilityForm);return {pa_cost:Number(f.get('pa')||0),ea_cost:Number(f.get('ea')||0),damage_die:Number(f.get('die')||0),damage_dice_count:Number(f.get('diceCount')||0),range:f.get('range'),targets:f.get('targets'),duration:f.get('duration'),condition_severity:f.get('condition'),condition_key:f.get('conditionKey')||null,once_per_combat:f.get('onceCombat')==='on',once_per_mission:f.get('onceMission')==='on',requires_preparation:f.get('preparation')==='on',meaningful_drawback:f.get('drawback')==='on',requires_attack:f.get('requiresAttack')==='on',is_reaction:f.get('isReaction')==='on',attack_attribute_key:f.get('attackAttribute'),attack_skill_key:f.get('attackSkill'),damage_flat_attribute_key:f.get('damageFlatAttribute')||null,uses_cursed_energy:f.get('usesCursedEnergy')==='on',forced_critical:f.get('forcedCritical')==='on',critical_threshold:Number(f.get('criticalThreshold')||20)};};
+    const updateBodyVp=()=>{const vp=estimateAbilityVP(bodyAbilityConfig());root.querySelector('#cursed-body-vp-preview').textContent=`VP de referência: ${vp}`;const field=bodyAbilityForm.elements.vpApproved;if(!field.dataset.touched)field.value=vp;};
+    bodyAbilityForm.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',()=>{if(el.name==='vpApproved')el.dataset.touched='1';updateBodyVp();}));
+    updateBodyVp();
+    bodyAbilityForm.onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);const config=bodyAbilityConfig();const estimated=estimateAbilityVP(config);await withBusy(()=>api.createAbility({character_id:character.id,cursed_body_technique_id:cursedBody.id,category:f.get('category'),name:f.get('name'),description:f.get('description'),mechanics:f.get('mechanics'),config,vp_estimated:estimated,vp_approved:Number(f.get('vpApproved')||estimated),limit_override:false,status:cursedBody.is_released?'approved':'disabled',master_response:cursedBody.is_released?'Concedida pelo Mestre através da Técnica do Corpo.':'Oculta até o Mestre liberar a Técnica do Corpo.'}),'Habilidade do Corpo criada.');renderMasterSecret(root,character);};
+    root.querySelectorAll('[data-delete-body-ability]').forEach(btn=>btn.onclick=async()=>{const a=cursedBodyAbilities.find(x=>x.id===btn.dataset.deleteBodyAbility);if(!a||!confirm(`Excluir a habilidade corporal "${a.name}"?`))return;await withBusy(()=>api.deleteAbility(a.id),'Habilidade do Corpo excluída.');renderMasterSecret(root,character);});
+  }
+
   await renderMasterEquipmentManager(root.querySelector('#master-equipment-manager'),character,combatContext(root),()=>renderMasterSecret(root,character));
   bindConditionLinks(root);
 }
-
 function subscribeCombatRealtime(encounterId, rerender) {
   if (state.realtimeChannel) {
     supabase.removeChannel(state.realtimeChannel);
