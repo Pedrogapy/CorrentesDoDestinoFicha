@@ -123,6 +123,25 @@ function downloadJson(filename, data) {
   URL.revokeObjectURL(url);
 }
 
+
+const MASTER_ENTITY_GROUPS = [
+  { key:'player', title:'Players', label:'PLAYER', cls:'player', empty:'Nenhum player.' },
+  { key:'npc', title:'NPCs', label:'NPC', cls:'npc', empty:'Nenhum NPC.' },
+  { key:'curse', title:'Maldições', label:'MALDIÇÃO', cls:'curse', empty:'Nenhuma maldição.' },
+  { key:'enemy', title:'Inimigos', label:'INIMIGO', cls:'enemy', empty:'Nenhum inimigo.' },
+  { key:'summon', title:'Invocações / Fichas Filhas', label:'INVOCAÇÃO', cls:'summon', empty:'Nenhuma invocação.' },
+];
+
+function masterEntityGroupsHtml(characters=[]) {
+  return MASTER_ENTITY_GROUPS.map(group=>{
+    const rows=characters.filter(c=>c.entity_type===group.key);
+    if(!rows.length) return '';
+    return `<section class="entity-group entity-group-${group.cls}">
+      <div class="entity-group-head"><div><span class="entity-group-dot"></span><strong>${group.title}</strong></div><span class="pill">${rows.length}</span></div>
+      <div class="list">${rows.map(c=>`<button class="list-item entity-select-card entity-type-${group.cls}" data-select-entity="${c.id}"><div class="btn-row"><div class="title">${esc(getName(c))}</div><span class="entity-type-badge">${group.label}</span></div><div class="meta">Nv ${c.level} • ${esc(c.grade)}</div></button>`).join('')}</div>
+    </section>`;
+  }).join('') || '<p class="muted">Nenhuma entidade cadastrada.</p>';
+}
 function getName(character) {
   return [character?.first_name, character?.last_name].filter(Boolean).join(' ').trim() || 'Sem nome';
 }
@@ -671,7 +690,7 @@ async function renderMasterPage() {
     </section>
     <div style="height:14px"></div>
     <section class="grid grid-2">
-      <div class="card"><h2>Entidades</h2><div class="list">${state.masterCharacters.map(c=>`<button class="list-item" style="text-align:left;color:inherit;width:100%" data-select-entity="${c.id}"><div class="title">${esc(getName(c))}</div><div class="meta">${esc(c.entity_type)} • Nv ${c.level} • ${esc(c.grade)}</div></button>`).join('')}</div></div>
+      <div class="card"><h2>Fichas por categoria</h2><div class="entity-groups">${masterEntityGroupsHtml(state.masterCharacters)}</div></div>
       <div class="card"><h2>Fila de habilidades</h2><div class="list">${pendingAbilities.length?pendingAbilities.map(a=>`<div class="list-item"><div class="title">${esc(a.name)}</div><div class="meta">${esc(getName(a.characters))} • VP estimado ${a.vp_estimated}</div><div class="body">${esc(a.description)}\n${esc(a.mechanics)}</div><div class="field-row" style="margin-top:8px"><label>VP aprovado<input type="number" min="1" value="${a.vp_estimated}" data-vp-approved="${a.id}" /></label><label>Resposta<input data-ability-response="${a.id}" /></label></div><div class="btn-row" style="margin-top:8px"><button class="btn good" data-approve-ability="${a.id}">Aprovar</button><button class="btn bad" data-reject-ability="${a.id}">Rejeitar</button></div></div>`).join(''):'<p class="muted">Nada pendente.</p>'}</div></div>
     </section>
     <div style="height:14px"></div>

@@ -1,0 +1,293 @@
+{
+  "character": {
+    "entity_type": "curse",
+    "first_name": "Maldição da Rua Sem Nome",
+    "last_name": "",
+    "nickname": "Maldição das Placas",
+    "grade": "Grau 2",
+    "level": 8,
+    "xp": 0,
+    "biography": "Maldição formada pelo medo de caminhos errados, nomes apagados, lugares sem identificação e pela sensação de não conseguir voltar. Foi o chefe da ocorrência na Rua Kamimori e no interior da Loja Sem Nome.",
+    "personality": "Não busca apenas matar. Confunde, separa, imita vozes e tenta aprender o nome de quem entra em seu espaço.",
+    "goals": "Desorientar intrusos, apagar referências e prender pessoas em rotas que não levam de volta.",
+    "appearance": "Criatura alta, fina, sombria e humanoide, de aparência elegante e perturbadora, carregando placas metálicas sem nome.",
+    "notes": "VERSÃO DE TREINO NO SISTEMA ATUAL. A ficha original tinha PS 110, CA 14 e três placas em branco. Para ensinar o site sem transformar a demonstração em uma luta excessivamente longa, o PS foi convertido para a escala atual. As três placas foram representadas como 3 cargas de um equipamento reativo.",
+    "image_url": "",
+    "image_path": "",
+    "technique_name": "Lugar Sem Nome",
+    "technique_description": "Dobra rotas, apaga referências e transforma nomes em pontos de influência. A maldição usa placas em branco, portas falsas, reflexos atrasados e chamadas pelo nome para controlar o campo. Suas três placas defensivas são representadas no site pelo equipamento Conjunto de Placas em Branco, com 3 cargas.",
+    "attributes": {
+      "strength": 2,
+      "dexterity": 4,
+      "resistance": 4,
+      "intelligence": 2,
+      "perception": 3,
+      "will": 3,
+      "presence": 1,
+      "cursed_control": 4
+    },
+    "skills": {
+      "athletics": 0,
+      "fight": 2,
+      "grapple": 0,
+      "impact": 0,
+      "acrobatics": 0,
+      "reflexes": 2,
+      "stealth": 1,
+      "aim": 0,
+      "defend": 1,
+      "fortitude": 1,
+      "steadiness": 0,
+      "survival": 0,
+      "investigation": 0,
+      "occultism": 2,
+      "technical_sorcery": 0,
+      "medicine": 0,
+      "technology": 0,
+      "attention": 1,
+      "intuition": 0,
+      "tracking": 0,
+      "combat_reading": 0,
+      "concentration": 0,
+      "self_control": 0,
+      "mental_resistance": 1,
+      "spiritual_resistance": 0,
+      "persuasion": 0,
+      "deception": 2,
+      "intimidation": 1,
+      "leadership": 0,
+      "performance": 0,
+      "channeling": 0,
+      "reinforcement": 0,
+      "technique_control": 3,
+      "cursed_suppression": 0
+    },
+    "growth_vigor": 5,
+    "growth_reserve": 3,
+    "permanent_ps_bonus": 28,
+    "permanent_ea_bonus": 8
+  },
+  "abilities": [
+    {
+      "category": "technique",
+      "name": "Corte de Placa",
+      "description": "A placa vazia se alonga em uma lâmina irregular e corta o alvo junto com a referência espacial ao redor dele.",
+      "mechanics": "Custo: 1 PA e 3 EA. Ataque de Controle Amaldiçoado + Controle de Técnica, corpo a corpo. Em acerto causa 2d6 + Mod. Controle Amaldiçoado. É um golpe direto que conduz Energia Amaldiçoada e pode gerar Kokusen em 20 natural.",
+      "config": {
+        "pa_cost": 1,
+        "ea_cost": 3,
+        "damage_die": 6,
+        "damage_dice_count": 2,
+        "range": "touch",
+        "targets": "one",
+        "duration": "instant",
+        "condition_severity": "none",
+        "condition_key": null,
+        "requires_attack": true,
+        "attack_attribute_key": "cursed_control",
+        "attack_skill_key": "technique_control",
+        "damage_flat_attribute_key": "cursed_control",
+        "uses_cursed_energy": true,
+        "forced_critical": false,
+        "critical_threshold": 20
+      },
+      "vp_estimated": 3,
+      "vp_approved": 3,
+      "limit_override": true,
+      "status": "approved"
+    },
+    {
+      "category": "technique",
+      "name": "Rua Errada",
+      "description": "O espaço dobra por um instante e o alvo percebe uma rota que não existe, perdendo noção de direção e tempo.",
+      "mechanics": "Custo: 1 PA e 4 EA. Ataque de Controle Amaldiçoado + Controle de Técnica contra um alvo Perto. Não causa dano. Em acerto aplica Atordoado. Para este combate de treino, remova Atordoado ao fim do próximo turno do alvo.",
+      "config": {
+        "pa_cost": 1,
+        "ea_cost": 4,
+        "damage_die": 0,
+        "damage_dice_count": 0,
+        "range": "near",
+        "targets": "one",
+        "duration": "one_round",
+        "condition_severity": "moderate",
+        "condition_key": "stunned",
+        "requires_attack": true,
+        "attack_attribute_key": "cursed_control",
+        "attack_skill_key": "technique_control",
+        "damage_flat_attribute_key": null,
+        "uses_cursed_energy": true,
+        "forced_critical": false,
+        "critical_threshold": 20
+      },
+      "vp_estimated": 4,
+      "vp_approved": 4,
+      "limit_override": true,
+      "status": "approved"
+    },
+    {
+      "category": "technique",
+      "name": "Chamada Pelo Nome",
+      "description": "A maldição pronuncia o nome do alvo com uma voz familiar e tenta fazer sua própria identidade responder ao chamado errado.",
+      "mechanics": "Custo: 1 PA e 4 EA. Teste resistido de Controle Amaldiçoado + Controle de Técnica contra Vontade + Resistência Mental do alvo. Em falha do alvo, ele perde 1 PA no próximo turno. Cada alvo só pode sofrer esta habilidade uma vez por combate.",
+      "config": {
+        "pa_cost": 1,
+        "ea_cost": 4,
+        "range": "far",
+        "targets": "one",
+        "duration": "one_round",
+        "condition_severity": "moderate",
+        "requires_attack": false,
+        "uses_cursed_energy": true,
+        "once_per_combat_per_target": true,
+        "contest": {
+          "attacker_attribute": "cursed_control",
+          "attacker_skill": "technique_control",
+          "defender_attribute": "will",
+          "defender_skill": "mental_resistance"
+        },
+        "combat_effect": {
+          "key": "stolen_name",
+          "name": "Nome Roubado",
+          "data": {
+            "pa_penalty_next_turn": 1,
+            "remove_on_target_turn_start": true
+          }
+        }
+      },
+      "vp_estimated": 4,
+      "vp_approved": 4,
+      "limit_override": true,
+      "status": "approved"
+    },
+    {
+      "category": "technique",
+      "name": "Reflexo Que Atrasa",
+      "description": "O reflexo do alvo começa a reagir antes ou depois do corpo real, fazendo seus ataques perderem o momento correto.",
+      "mechanics": "Custo: 1 PA e 3 EA. Teste resistido de Controle Amaldiçoado + Controle de Técnica contra Vontade + Resistência Mental. Se a maldição vencer, o alvo recebe -2 nos ataques até encerrar o próprio próximo turno.",
+      "config": {
+        "pa_cost": 1,
+        "ea_cost": 3,
+        "range": "near",
+        "targets": "one",
+        "duration": "one_round",
+        "condition_severity": "minor",
+        "requires_attack": false,
+        "uses_cursed_energy": true,
+        "contest": {
+          "attacker_attribute": "cursed_control",
+          "attacker_skill": "technique_control",
+          "defender_attribute": "will",
+          "defender_skill": "mental_resistance"
+        },
+        "combat_effect": {
+          "key": "delayed_reflection",
+          "name": "Reflexo Atrasado",
+          "remaining_turns": 1,
+          "data": {
+            "attack_bonus": -2,
+            "decrement_on": "target_end"
+          }
+        }
+      },
+      "vp_estimated": 3,
+      "vp_approved": 3,
+      "limit_override": true,
+      "status": "approved"
+    },
+    {
+      "category": "technique",
+      "name": "Porta Que Não Abre",
+      "description": "Quando o golpe deveria alcançar a maldição, o caminho entre atacante e alvo se fecha como uma porta que nunca esteve ali.",
+      "mechanics": "REAÇÃO. Custo: 1 PA e 3 EA. Alvo próprio. Cria uma distorção que reduz o próximo dano recebido em 1d8. Pode ser usada fora do turno quando um ataque ameaça a maldição.",
+      "config": {
+        "pa_cost": 1,
+        "ea_cost": 3,
+        "range": "self",
+        "targets": "self",
+        "target_mode": "self",
+        "duration": "instant",
+        "condition_severity": "none",
+        "requires_attack": false,
+        "uses_cursed_energy": true,
+        "is_reaction": true,
+        "activation_timing": "reaction",
+        "combat_effect": {
+          "key": "door_that_wont_open",
+          "name": "Porta Que Não Abre",
+          "uses": 1,
+          "data": {
+            "damage_reduction_dice_count": 1,
+            "damage_reduction_die": 8,
+            "applies_to": "any",
+            "remove_when_empty": true,
+            "expires_on_source_turn_start": true
+          }
+        }
+      },
+      "vp_estimated": 3,
+      "vp_approved": 3,
+      "limit_override": true,
+      "status": "approved"
+    }
+  ],
+  "equipment": [
+    {
+      "name": "Conjunto de Placas em Branco",
+      "equipment_type": "Amuleto / Acessório",
+      "category": "accessory",
+      "subtype": "Placas amaldiçoadas",
+      "is_cursed": true,
+      "grade": "Grau 2",
+      "status": "approved",
+      "master_response": "As três cargas representam as três placas em branco da Maldição da Rua Sem Nome.",
+      "description": "Três placas metálicas sem identificação orbitam o espaço da maldição e desviam impactos para rotas inexistentes.",
+      "mechanics": "Possui 3 cargas. Cada ativação de Lugar Sem Nome consome uma placa/carga e reduz o próximo dano recebido em 1d4 + 1. Para o teste do site, as cargas substituem o controle separado de PS/CA de cada placa da ficha antiga.",
+      "image_url": "",
+      "charges_current": 3,
+      "charges_max": 3,
+      "active": true,
+      "hands": 0,
+      "weapon_profile": null,
+      "weapon_range": "melee",
+      "wear_slot": "accessory",
+      "can_hold": false,
+      "vp_limit_override": false,
+      "attack_config": {
+        "enabled": false
+      },
+      "effects": [
+        {
+          "id": "a5b39952-80b0-4d0e-a4fd-51859e12ef01",
+          "name": "Lugar Sem Nome",
+          "type": "reaction",
+          "description": "Uma das placas intercepta o golpe e desvia parte do impacto para uma rota impossível.",
+          "mechanics": "REAÇÃO. 0 PA, 0 EA, 1 carga. Reduz o próximo dano recebido em 1d4 + 1. A carga representa uma placa usada/destruída.",
+          "vp": 2,
+          "config": {
+            "pa_cost": 0,
+            "ea_cost": 0,
+            "charges_cost": 1,
+            "range": "self",
+            "targets": "self",
+            "target_mode": "self",
+            "is_reaction": true,
+            "activation_timing": "reaction",
+            "combat_effect": {
+              "key": "blank_sign_guard",
+              "name": "Placa em Branco",
+              "uses": 1,
+              "data": {
+                "damage_reduction_dice_count": 1,
+                "damage_reduction_die": 4,
+                "damage_reduction_flat": 1,
+                "applies_to": "any",
+                "remove_when_empty": true
+              }
+            }
+          }
+        }
+      ],
+      "equip_slot": "accessory_1"
+    }
+  ]
+}

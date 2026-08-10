@@ -2,6 +2,24 @@ import * as api from './api.js';
 import { ATTRIBUTES, SKILLS, ATTRIBUTE_BY_KEY, SKILL_BY_KEY, characterDerived, weaponDamageProfile } from './system.js';
 import { equipmentEffectCombatDefaults } from './equipment-ui.js';
 
+const COMBAT_ENTITY_GROUPS = [
+  { key:'player', title:'Players', cls:'player' },
+  { key:'npc', title:'NPCs', cls:'npc' },
+  { key:'curse', title:'Maldições', cls:'curse' },
+  { key:'enemy', title:'Inimigos', cls:'enemy' },
+  { key:'summon', title:'Invocações', cls:'summon' },
+];
+
+function combatEntityPickerHtml(characters=[], inCombat=new Set(), esc=(v)=>String(v), getName=(c)=>c?.first_name||'Entidade') {
+  const available=characters.filter(c=>!inCombat.has(c.id));
+  if(!available.length) return '<p class="muted">Todas as fichas disponíveis já estão no combate.</p>';
+  return `<div class="combat-entity-picker">${COMBAT_ENTITY_GROUPS.map(group=>{
+    const rows=available.filter(c=>c.entity_type===group.key);
+    if(!rows.length) return '';
+    return `<div class="combat-entity-group entity-group-${group.cls}"><div class="combat-entity-group-title"><span class="entity-group-dot"></span>${group.title}<span class="pill">${rows.length}</span></div><div class="btn-row">${rows.map(c=>`<button class="btn entity-add-btn entity-type-${group.cls}" data-add-combat="${c.id}">${esc(getName(c))}</button>`).join('')}</div></div>`;
+  }).join('')}</div>`;
+}
+
 function optionList(items, selected='') {
   return items.map(item => `<option value="${item.key}" ${item.key===selected?'selected':''}>${item.name}</option>`).join('');
 }
@@ -459,7 +477,7 @@ export async function renderMasterCombatPageV2(ctx) {
     <section class="card combat-master-controls"><div class="btn-row"><div><strong>${esc(active.name)}</strong><div class="muted small">${activeParticipant?`Turno iniciado para ${esc(actorName)}.`:'Nenhum turno ativo.'}</div>${lastUndo?`<div class="muted small" style="margin-top:4px">Última ação desfazível: <strong>${esc(lastUndo.label)}</strong></div>`:'<div class="muted small" style="margin-top:4px">Ainda não há ação para desfazer.</div>'}</div><div class="btn-row"><button class="btn warn" id="undo-combat" ${lastUndo?'':'disabled'}>Desfazer última ação</button><button class="btn bad" id="end-encounter">Encerrar combate</button></div></div></section>
     <div style="height:14px"></div><section class="card">${turnStatus}</section>
     <div style="height:14px"></div>
-    <section class="grid grid-2"><div class="card"><h2>Participantes</h2><div class="list">${participants.map(p=>participantCard(p,ctx,true,active.active_participant_id,caMap)).join('')||'<p class="muted">Vazio.</p>'}</div><h3>Adicionar</h3><div class="btn-row">${state.masterCharacters.filter(c=>!inCombat.has(c.id)).map(c=>`<button class="btn" data-add-combat="${c.id}">${esc(getName(c))}</button>`).join('')}</div></div>
+    <section class="grid grid-2"><div class="card"><h2>Participantes</h2><div class="list">${participants.map(p=>participantCard(p,ctx,true,active.active_participant_id,caMap)).join('')||'<p class="muted">Vazio.</p>'}</div><h3>Adicionar fichas</h3>${combatEntityPickerHtml(state.masterCharacters,inCombat,esc,getName)}</div>
     <div class="card"><h2>Ações do turno</h2>${actor?`<div class="list-item"><div class="title">${esc(actorName)}</div>${specialResourcesHtml(activeParticipant,esc,true,'master-resource')}<div style="margin-top:8px">${combatEffectsHtml(effects,actor.id,esc)}</div></div><form id="master-basic" class="grid" style="margin-top:10px"><h3>Golpe corpo a corpo</h3><label>Alvo<select name="target">${hostileTargetOpts}</select></label><label style="display:flex;align-items:center;gap:7px"><input name="cursed" type="checkbox" style="width:auto" /> Conduzir +1 EA</label><button class="btn bad">Atacar em segredo</button></form><hr style="border-color:#333"><form id="master-skill" class="grid"><h3>Teste secreto</h3><label>Perícia<select name="skill">${optionList(SKILLS)}</select></label>${modeFields('')}<button class="btn bad">Rolar em segredo</button></form>`:'<div class="notice">Nenhuma entidade pode realizar ação normal até você iniciar um turno.</div>'}</div></section>
     ${actor?`<div style="height:14px"></div><section class="grid grid-2"><div class="card"><h2>Habilidades de ${esc(actorName)}</h2><div class="list">${actorAbilityCards.join('')||'<p class="muted">Nenhuma habilidade aprovada.</p>'}</div>${actorBundle.children.length?`<div class="list" style="margin-top:10px">${actorBundle.children.map(({child})=>{const on=child.id===activeSummonId;return `<div class="list-item"><div class="btn-row"><div class="title">${esc(getName(child))}</div><span class="pill ${on?'good':'bad'}">${on?'ATIVA':'INATIVA'}</span>${on?`<button class="btn warn" data-master-dismiss-summon="${child.id}" data-summon-name="${esc(getName(child))}">Dispensar</button>`:''}</div></div>`}).join('')}</div>`:''}</div>
     <div class="card"><h2>Equipamentos de ${esc(actorName)}</h2><div class="list">${attackEquipment.map(i=>{const c=equipmentDefaults(i);const base=weaponDamageProfile(i.weapon_profile||'standard',false);const canTwo=i.weapon_profile==='standard'&&i.equip_slot==='main_hand'&&offHandFree;const temp=i.temporary_encounter_id?`<span class="pill warn">TEMPORÁRIO • ${i.temporary_turns_remaining??'?'} turno(s)</span>`:'';return `<div class="list-item"><div class="btn-row"><div class="title">${esc(i.name)}</div>${temp}</div><div class="meta">${base.paCost} PA • ${base.damageDiceCount}d${base.damageDie}</div><label>Alvo<select data-master-equipment-target="${i.id}">${hostileTargetOpts}</select></label>${canTwo?`<label><input type="checkbox" data-master-equipment-two-hands="${i.id}" style="width:auto" /> Duas mãos • 1d10</label>`:''}${!c.usesCursedEnergy?`<label><input type="checkbox" data-master-equipment-reinforce="${i.id}" style="width:auto" /> Conduzir +1 EA</label>`:''}<button class="btn bad" data-master-use-equipment="${i.id}">Atacar</button></div>`}).join('')||'<p class="muted">Nenhuma arma equipada.</p>'}${effectEquipment.filter(({effect,variant})=>!(effect.type==='reaction'||isReactionConfig(variant.config))).map(({item,effect,variant})=>equipmentEffectCardCombat({item,effect,variant,targets,actorId:actor.id,actorName,esc,enabled:true,prefix:'master-equipment-effect'})).join('')}${passiveEquipment.map(({item,effect})=>`<div class="list-item"><div class="title">${esc(item.name)} • ${esc(effect.name)}</div><span class="pill good">Passivo equipado</span><div class="body">${esc(effect.mechanics||effect.description||'')}</div></div>`).join('')}</div></div></section>`:''}

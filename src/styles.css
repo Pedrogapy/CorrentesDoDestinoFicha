@@ -219,3 +219,48 @@ label { display:grid; gap:6px; font-size:.83rem; font-weight:750; color:#c8c4cc;
 .cursed-body-master-zone .card {
   background:#111116;
 }
+
+/* ============================================================
+   Organização visual de fichas por categoria v0.7.3
+   ============================================================ */
+.entity-groups,
+.combat-entity-picker { display:grid; gap:12px; }
+.entity-group,
+.combat-entity-group { border:1px solid var(--line); background:#0d0d11; padding:10px; }
+.entity-group-head,
+.combat-entity-group-title { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; font-weight:900; }
+.entity-group-head > div,
+.combat-entity-group-title { gap:8px; }
+.entity-group-head > div { display:flex; align-items:center; }
+.entity-group-dot { width:9px; height:9px; border-radius:50%; display:inline-block; background:#777; box-shadow:0 0 0 2px rgba(255,255,255,.04); }
+.entity-select-card { display:block; text-align:left; color:inherit; width:100%; cursor:pointer; border-left-width:4px; transition:transform .12s ease,border-color .12s ease,background .12s ease; }
+.entity-select-card:hover { transform:translateX(2px); background:#15151b; }
+.entity-type-badge { padding:3px 6px; font-size:.67rem; font-weight:1000; letter-spacing:.08em; border:1px solid currentColor; }
+.entity-add-btn { border-left-width:4px; }
+
+.entity-group-player .entity-group-dot { background:#4fb783; }
+.entity-group-npc .entity-group-dot { background:#5f93d4; }
+.entity-group-curse .entity-group-dot { background:#d34d72; }
+.entity-group-enemy .entity-group-dot { background:#d79a45; }
+.entity-group-summon .entity-group-dot { background:#8b73d6; }
+
+.entity-type-player { border-left-color:#4fb783 !important; }
+.entity-type-npc { border-left-color:#5f93d4 !important; }
+.entity-type-curse { border-left-color:#d34d72 !important; }
+.entity-type-enemy { border-left-color:#d79a45 !important; }
+.entity-type-summon { border-left-color:#8b73d6 !important; }
+.entity-type-player .entity-type-badge { color:#8ee0b2; }
+.entity-type-npc .entity-type-badge { color:#9fc8ff; }
+.entity-type-curse .entity-type-badge { color:#ff9ab4; }
+.entity-type-enemy .entity-type-badge { color:#f4c177; }
+.entity-type-summon .entity-type-badge { color:#c1b1ff; }
+
+.combat-entity-group .btn-row { justify-content:flex-start; }
+.combat-entity-group-title { justify-content:flex-start; color:#ddd9e3; font-size:.83rem; text-transform:uppercase; letter-spacing:.07em; }
+.combat-entity-group-title .pill { margin-left:auto; }
+
+@media (max-width:720px) {
+  .entity-group-head { align-items:flex-start; }
+  .combat-entity-group .btn-row { display:grid; grid-template-columns:1fr; }
+  .entity-add-btn { width:100%; text-align:left; }
+}
