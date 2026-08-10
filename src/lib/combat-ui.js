@@ -248,9 +248,35 @@ async function executeEquipment(item, actorId, encounterId, targetId, reinforce=
   });
 }
 
+async function safeCombatRead(label, operation, fallback) {
+  try {
+    return await operation();
+  } catch (error) {
+    console.warn(`[Combate] ${label} indisponível; usando fallback.`, error);
+    return typeof fallback === 'function' ? fallback(error) : fallback;
+  }
+}
+
+function fallbackTargetsFromParticipants(participants=[]) {
+  return participants.filter(p=>p?.characters).map(p=>{
+    const c=p.characters;
+    const d=characterDerived(c);
+    return {
+      character_id:p.character_id,
+      display_name:[c.first_name,c.last_name].filter(Boolean).join(' ') || 'Personagem',
+      ca:d.ca,
+      defeated:Boolean(p.defeated),
+    };
+  });
+}
+
 async function loadAbilityBundle(parentCharacterId) {
-  const [parentAbilities,children]=await Promise.all([api.getAbilities(parentCharacterId),api.getChildSheets(parentCharacterId)]);
-  const childRows=await Promise.all(children.map(async child=>({child,abilities:await api.getAbilities(child.id)})));
+  const parentAbilities=await safeCombatRead('habilidades do personagem',()=>api.getAbilities(parentCharacterId),[]);
+  const children=await safeCombatRead('fichas filhas',()=>api.getChildSheets(parentCharacterId),[]);
+  const childRows=await Promise.all(children.map(async child=>({
+    child,
+    abilities:await safeCombatRead(`habilidades da ficha filha ${child?.id||''}`,()=>api.getAbilities(child.id),[]),
+  })));
   return {parentAbilities,children:childRows};
 }
 
@@ -291,9 +317,15 @@ export async function renderPlayerCombatPageV2(ctx) {
   if(!active){ctx.subscribeCombatRealtime?.(null,()=>{});root.innerHTML=`${pageHeader('Sala de combate','Combate')}<div class="notice">Nenhum combate ativo.</div>`;return;}
   ctx.subscribeCombatRealtime?.(active.id,()=>renderPlayerCombatPageV2(ctx));
 
-  const [participants,targets,actions,equipment,bundle,effects]=await Promise.all([
-    api.getCombatParticipants(active.id),api.getCombatTargets(active.id),api.getVisibleCombatActions(active.id),api.getEquipment(state.character.id),loadAbilityBundle(state.character.id),api.getCombatEffects(active.id)
+  const participants=await api.getCombatParticipants(active.id);
+  const [targetsRaw,actions,equipment,bundle,effects]=await Promise.all([
+    safeCombatRead('alvos do combate',()=>api.getCombatTargets(active.id),null),
+    safeCombatRead('histórico de ações',()=>api.getVisibleCombatActions(active.id),[]),
+    safeCombatRead('equipamentos em combate',()=>api.getEquipment(state.character.id),[]),
+    loadAbilityBundle(state.character.id),
+    safeCombatRead('efeitos temporários',()=>api.getCombatEffects(active.id),[]),
   ]);
+  const targets=Array.isArray(targetsRaw)?targetsRaw:fallbackTargetsFromParticipants(participants);
   const mine=participants.find(p=>p.character_id===state.character.id);
   const activeParticipant=participants.find(p=>p.id===active.active_participant_id)||null;
   const isMyTurn=Boolean(mine && activeParticipant?.id===mine.id);
@@ -369,9 +401,14 @@ export async function renderMasterCombatPageV2(ctx) {
 
   const active=state.activeEncounter;
   ctx.subscribeCombatRealtime?.(active.id,()=>renderMasterCombatPageV2(ctx));
-  const [participants,targets,actions,lastUndo,effects]=await Promise.all([
-    api.getCombatParticipants(active.id),api.getCombatTargets(active.id),api.getVisibleCombatActions(active.id),api.getLatestCombatUndo(active.id).catch(()=>null),api.getCombatEffects(active.id)
+  const participants=await api.getCombatParticipants(active.id);
+  const [targetsRaw,actions,lastUndo,effects]=await Promise.all([
+    safeCombatRead('alvos do combate',()=>api.getCombatTargets(active.id),null),
+    safeCombatRead('histórico de ações',()=>api.getVisibleCombatActions(active.id),[]),
+    safeCombatRead('última ação desfazível',()=>api.getLatestCombatUndo(active.id),null),
+    safeCombatRead('efeitos temporários',()=>api.getCombatEffects(active.id),[]),
   ]);
+  const targets=Array.isArray(targetsRaw)?targetsRaw:fallbackTargetsFromParticipants(participants);
   state.encounterParticipants=participants;
   const caMap=Object.fromEntries(targets.map(t=>[t.character_id,t.ca]));
   const inCombat=new Set(participants.map(p=>p.character_id));
@@ -381,7 +418,7 @@ export async function renderMasterCombatPageV2(ctx) {
   state.combatActorId=actor?.id||null;
 
   const actorBundle=actor?await loadAbilityBundle(actor.id):{parentAbilities:[],children:[]};
-  const actorEquipment=actor?await api.getEquipment(actor.id):[];
+  const actorEquipment=actor?await safeCombatRead('equipamentos da entidade ativa',()=>api.getEquipment(actor.id),[]):[];
   const approvedAbilities=actorBundle.parentAbilities.filter(a=>a.status==='approved');
   const activeSummonId=activeParticipant?.active_summon_character_id||null;
   const actorAbilityCards=actor?[
@@ -398,14 +435,17 @@ export async function renderMasterCombatPageV2(ctx) {
 
   // O Mestre também enxerga habilidades de reação de todos os participantes, não só de quem está no turno.
   const reactionData=await Promise.all(participants.map(async p=>{
-    const [bundle,equipment]=await Promise.all([loadAbilityBundle(p.character_id),api.getEquipment(p.character_id)]);
+    const [bundle,equipment]=await Promise.all([
+      loadAbilityBundle(p.character_id),
+      safeCombatRead(`equipamentos de reação ${p.character_id}`,()=>api.getEquipment(p.character_id),[]),
+    ]);
     const name=getName(p.characters);
     const activeChild=p.active_summon_character_id;
     const abilityEntries=[
       ...bundle.parentAbilities.filter(a=>a.status==='approved').flatMap(a=>abilityVariants(a).filter(v=>isReactionConfig(v.config)).map(variant=>({p,name,a,variant,locked:false}))),
       ...bundle.children.flatMap(({child,abilities})=>abilities.filter(a=>a.status==='approved').flatMap(a=>abilityVariants(a).filter(v=>isReactionConfig(v.config)).map(variant=>({p,name,a,variant,locked:child.id!==activeChild,summonName:getName(child)}))))
     ];
-    const equipmentEntries=equipment.filter(i=>i.status==='approved'&&(i.equipped||i.category==='consumable')).flatMap(item=>(item.effects||[]).filter(e=>e.type==='reaction'||isReactionConfig(e.config||{})).flatMap(effect=>effectVariants(effect).filter(v=>effect.type==='reaction'||isReactionConfig(v.config)).map(variant=>({p,name,item,effect,variant}))));
+    const equipmentEntries=equipment.filter(i=>i.status==='approved'&&(i.equipped||i.category==='consumable')).flatMap(item=>(Array.isArray(item.effects)?item.effects:[]).filter(e=>e.type==='reaction'||isReactionConfig(e.config||{})).flatMap(effect=>effectVariants(effect).filter(v=>effect.type==='reaction'||isReactionConfig(v.config)).map(variant=>({p,name,item,effect,variant}))));
     return {abilityEntries,equipmentEntries};
   }));
   const reactionAbilities=reactionData.flatMap(x=>x.abilityEntries);

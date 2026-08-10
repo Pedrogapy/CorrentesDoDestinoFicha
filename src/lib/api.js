@@ -516,7 +516,7 @@ export async function addCombatParticipant(encounterId, character) {
 export async function getCombatParticipants(encounterId) {
   const { data, error } = await supabase
     .from('combat_participants')
-    .select('*, characters(*)')
+    .select('*, characters:characters!combat_participants_character_id_fkey(*)')
     .eq('encounter_id', encounterId)
     .order('initiative', { ascending: false });
   if (error) throw error;

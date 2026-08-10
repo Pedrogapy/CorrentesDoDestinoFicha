@@ -291,7 +291,19 @@ function renderCurrentPage() {
     case 'training': return renderTrainingPage();
     case 'vows': return renderVowsPage();
     case 'equipment': return renderEquipmentPage();
-    case 'combat': { const ctx=combatContext(document.querySelector('#page')); return state.profile.role === 'master' ? renderMasterCombatPageV2(ctx) : renderPlayerCombatPageV2(ctx); }
+    case 'combat': {
+      const root=document.querySelector('#page');
+      const ctx=combatContext(root);
+      const task=state.profile.role === 'master' ? renderMasterCombatPageV2(ctx) : renderPlayerCombatPageV2(ctx);
+      // Um recurso opcional novo nunca deve deixar a página inteira em branco.
+      // Se alguma leitura de combate falhar, mostramos o erro e preservamos a navegação
+      // para que o Mestre consiga diagnosticar sem perder o restante da aplicação.
+      task?.catch?.((error)=>{
+        console.error('[Combate] falha ao renderizar:',error);
+        root.innerHTML=`${pageHeader('Falha ao carregar','Combate')}<section class="card"><h2>O combate não pôde ser carregado</h2><div class="notice bad">${esc(error?.message||error)}</div><div class="muted small" style="margin-top:10px">Recarregue a página. Se persistir, copie esta mensagem; a interface não ficará mais vazia silenciosamente.</div></section>`;
+      });
+      return task;
+    }
     case 'history': return renderHistoryPage();
     case 'master': return renderMasterPage();
     default: return renderSystemPage();
