@@ -450,3 +450,188 @@ select[multiple]{
   .combat-picker-select { grid-column:auto; }
   .combat-initiative-row { align-items:flex-start; flex-direction:column; }
 }
+
+/* ============================================================
+   Combate v0.8.2 — plano tático quadriculado
+   ============================================================ */
+.combat-board-card {
+  overflow:hidden;
+  border-color:#383a42;
+  background:linear-gradient(180deg,rgba(190,30,45,.055),transparent 130px),#0d0e12;
+}
+.combat-board-heading {
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:14px;
+  margin-bottom:10px;
+}
+.combat-board-modes { display:flex; gap:7px; flex-wrap:wrap; justify-content:flex-end; }
+.combat-board-help { margin-bottom:10px; }
+.combat-board-roster {
+  display:grid;
+  grid-template-columns:minmax(150px,.35fr) minmax(0,1fr);
+  gap:10px;
+  align-items:start;
+  padding:10px;
+  margin-bottom:10px;
+  border:1px solid #30323a;
+  background:#0a0b0e;
+}
+.combat-board-roster-title { display:flex; flex-direction:column; gap:3px; }
+.combat-board-roster-list { display:flex; flex-wrap:wrap; gap:6px; }
+.combat-board-scroll {
+  width:100%;
+  overflow:auto;
+  padding:7px;
+  border:1px solid #30323a;
+  background:#08090c;
+  scrollbar-color:#4d4f58 #111217;
+}
+.combat-board-grid {
+  --combat-board-cell:50px;
+  display:grid;
+  grid-template-columns:repeat(var(--combat-board-cols),var(--combat-board-cell));
+  grid-auto-rows:var(--combat-board-cell);
+  width:max-content;
+  min-width:100%;
+  position:relative;
+  background:#0b0c10;
+  box-shadow:0 0 0 1px #34363d;
+}
+.combat-board-cell {
+  position:relative;
+  min-width:var(--combat-board-cell);
+  min-height:var(--combat-board-cell);
+  border-right:1px solid #2b2d34;
+  border-bottom:1px solid #2b2d34;
+  background:linear-gradient(135deg,rgba(255,255,255,.018),transparent 50%);
+  transition:background .1s ease,box-shadow .1s ease;
+}
+.combat-board-cell:nth-child(2n) { background-color:rgba(255,255,255,.008); }
+.combat-board-cell:hover { background-color:rgba(190,30,45,.07); }
+.combat-board-coordinate {
+  position:absolute;
+  top:2px;
+  left:3px;
+  z-index:1;
+  font-size:.53rem;
+  font-weight:800;
+  color:#666a72;
+  pointer-events:none;
+  line-height:1;
+}
+.combat-board-cell.is-blocked {
+  background:
+    repeating-linear-gradient(135deg,rgba(190,30,45,.28) 0 5px,rgba(28,17,20,.86) 5px 10px),
+    #1a1114;
+}
+.combat-board-cell.is-blocked::after {
+  content:'×';
+  position:absolute;
+  inset:0;
+  display:grid;
+  place-items:center;
+  color:rgba(255,148,158,.42);
+  font-size:1.25rem;
+  font-weight:1000;
+  pointer-events:none;
+}
+.combat-board-cell.wall-n { box-shadow:inset 0 4px 0 #e24b5b; }
+.combat-board-cell.wall-e { border-right:4px solid #e24b5b; }
+.combat-board-cell.wall-s { border-bottom:4px solid #e24b5b; }
+.combat-board-cell.wall-w { box-shadow:inset 4px 0 0 #e24b5b; }
+.combat-board-cell.wall-n.wall-w { box-shadow:inset 0 4px 0 #e24b5b,inset 4px 0 0 #e24b5b; }
+.combat-board-cell.is-selected-cell { outline:2px solid #f4c177; outline-offset:-3px; z-index:4; }
+.combat-board-cell-tokens {
+  position:absolute;
+  inset:8px 3px 3px;
+  z-index:3;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-wrap:wrap;
+  gap:2px;
+  overflow:visible;
+}
+.combat-board-token {
+  --token-color:#90939b;
+  border:1px solid color-mix(in srgb,var(--token-color) 75%,#fff 10%);
+  background:#15171d;
+  color:#f2f1f4;
+  border-radius:7px;
+  min-width:31px;
+  min-height:31px;
+  padding:2px 4px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  cursor:default;
+  box-shadow:0 2px 7px rgba(0,0,0,.45),inset 0 -2px 0 color-mix(in srgb,var(--token-color) 40%,transparent);
+  position:relative;
+  z-index:4;
+}
+.combat-board-token[draggable="true"] { cursor:grab; }
+.combat-board-token[draggable="true"]:active { cursor:grabbing; }
+.combat-board-token.entity-type-player { --token-color:#4fb783; border-left-width:1px !important; }
+.combat-board-token.entity-type-npc { --token-color:#5f93d4; border-left-width:1px !important; }
+.combat-board-token.entity-type-curse { --token-color:#d34d72; border-left-width:1px !important; }
+.combat-board-token.entity-type-enemy { --token-color:#d79a45; border-left-width:1px !important; }
+.combat-board-token.entity-type-summon { --token-color:#8b73d6; border-left-width:1px !important; }
+.combat-board-token-initials { font-size:.66rem; font-weight:1000; line-height:1; color:var(--token-color); }
+.combat-board-token-name { display:none; font-size:.72rem; font-weight:900; white-space:nowrap; }
+.combat-board-token-turn {
+  position:absolute;
+  top:-7px;
+  right:-7px;
+  font-size:.45rem;
+  letter-spacing:.04em;
+  font-weight:1000;
+  padding:2px 3px;
+  background:#3a754d;
+  color:#fff;
+  border:1px solid #79bf8e;
+}
+.combat-board-token.turn-active { outline:2px solid #7ed79a; outline-offset:1px; }
+.combat-board-token.is-hidden-token { opacity:.52; filter:saturate(.65); }
+.combat-board-token.is-hidden-token::after {
+  content:'◌';
+  position:absolute;
+  bottom:-5px;
+  right:-5px;
+  padding:0 2px;
+  background:#090a0d;
+  color:#a5a7af;
+  font-size:.55rem;
+}
+.combat-board-token.not-targetable-token { border-style:dashed; }
+.combat-board-token.is-selected-token { outline:2px solid #f0c36d; outline-offset:2px; }
+.combat-board-token.is-palette-token {
+  min-height:32px;
+  padding:5px 8px;
+  justify-content:flex-start;
+}
+.combat-board-token.is-palette-token .combat-board-token-name { display:inline; }
+.combat-board-editor {
+  display:grid;
+  grid-template-columns:minmax(180px,.35fr) minmax(0,1fr);
+  gap:12px;
+  align-items:center;
+  margin-top:10px;
+  padding:10px;
+  border:1px solid #30323a;
+  background:#101116;
+}
+.combat-board-terrain-buttons { justify-content:flex-start; }
+.combat-board-card.terrain-mode .combat-board-cell { cursor:crosshair; }
+.combat-board-card.terrain-mode .combat-board-token { pointer-events:none; opacity:.72; }
+
+@media (max-width:800px) {
+  .combat-board-heading { flex-direction:column; }
+  .combat-board-modes { justify-content:flex-start; }
+  .combat-board-roster,
+  .combat-board-editor { grid-template-columns:1fr; }
+  .combat-board-grid { --combat-board-cell:44px; }
+  .combat-board-token { min-width:28px; min-height:28px; }
+}

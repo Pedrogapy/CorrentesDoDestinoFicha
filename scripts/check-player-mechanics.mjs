@@ -76,4 +76,4 @@ assert(fluxo?.config?.combat_effect?.data?.skill_modifiers?.reflexes===2 && flux
 assert((jin.equipment||[]).some(x=>x.name==='Uniforme Okkotsu'),'Uniforme Okkotsu precisa estar no pacote do Jin.');
 assert(jin.cursed_body?.name==='Circuito Hemático' && jin.cursed_body?.is_released===false && jin.cursed_body?.seed_only===true,'Circuito Hemático precisa existir oculto, preservando decisões futuras do Mestre.');
 
-console.log('OK: Aiko, Kotone e Jin preservam suas mecânicas canônicas dentro do motor estruturado v0.8.1.');
+console.log('OK: Aiko, Kotone e Jin preservam suas mecânicas canônicas dentro do motor estruturado v0.8.2.');

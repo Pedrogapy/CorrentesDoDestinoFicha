@@ -563,6 +563,35 @@ export async function updateCombatParticipant(id, changes, encounterId=null) {
   });
 }
 
+// ============================================================
+// TABULEIRO TÁTICO v0.8.2
+// ============================================================
+// Posição de peças é uma ação desfazível do combate. Edição de terreno não é:
+// paredes e quadrados bloqueados podem ser marcados/desmarcados livremente pelo
+// Mestre sem substituir a última ação mecânica que ele talvez queira desfazer.
+export async function moveCombatToken(encounterId, participantId, x=null, y=null, label='Mover peça no tabuleiro') {
+  return withCombatUndo(encounterId, label, async()=>{
+    const { data, error } = await supabase.rpc('move_combat_token', {
+      p_encounter_id: encounterId,
+      p_participant_id: participantId,
+      p_x: x,
+      p_y: y,
+    });
+    if (error) throw error;
+    return data;
+  });
+}
+
+export async function setCombatBoardState(encounterId, { blockedCells=null, walls=null }={}) {
+  const { data, error } = await supabase.rpc('set_combat_board_state', {
+    p_encounter_id: encounterId,
+    p_blocked_cells: blockedCells,
+    p_walls: walls,
+  });
+  if (error) throw error;
+  return data;
+}
+
 export async function logRoll(payload) {
   const { data, error } = await supabase.from('roll_logs').insert(payload).select('*').single();
   if (error) throw error;

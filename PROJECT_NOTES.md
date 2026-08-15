@@ -189,3 +189,18 @@ Regras canônicas implementadas no site:
 - Ataques básicos/armas podem mirar qualquer outro participante liberado, inclusive aliados. Habilidades continuam respeitando a relação cadastrada.
 - Nova relação estruturada `other`: "Qualquer outro participante". Técnicas ofensivas comuns dos players usam `other`; controles/suportes específicos podem continuar `enemy`, `ally`, `ally_or_self` ou `self`.
 - O Mestre pode alternar visibilidade e alvo em tempo real na própria carta do participante; cada toggle é mutação desfazível.
+
+## v0.8.2 — Tabuleiro tático de combate
+- Todo encontro ativo possui plano quadriculado 14x10.
+- A posição é por `combat_participants.board_x/board_y`; não altera a ficha permanente.
+- O Mestre controla todas as peças. Players recebem plano somente leitura.
+- Visibilidade do token segue `visible_to_players`; ocultar participante também o oculta do plano público.
+- `targetable_by_players=false` não remove o token visível, apenas o deixa marcado como não-alvejável.
+- Terreno do encontro usa `combat_encounters.board_blocked_cells` e `board_walls`.
+- `board_blocked_cells`: lista de chaves `x:y`.
+- `board_walls`: arestas normalizadas `h:x:y` e `v:x:y`, evitando duas paredes logicamente distintas na mesma divisa.
+- Mestre pode bloquear/desbloquear quadrado e alternar parede N/E/S/W a qualquer momento.
+- Grid é referência espacial; não converte quadrados em metros e não aplica custo de PA/movimento automaticamente.
+- Mover token usa o motor de Undo. Edição de terreno fica fora do Undo para não sobrescrever a última ação mecânica.
+- `move_combat_token` e `set_combat_board_state` são `security definer` com checagem explícita de Mestre.
+- Trigger impede players de alterar `board_x/board_y` por request manual.

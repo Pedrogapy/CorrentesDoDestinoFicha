@@ -490,6 +490,196 @@ function playerInitiativeHtml(targets=[], activeParticipantId=null, esc=(v)=>Str
   }).join('')}</div>`;
 }
 
+// ============================================================
+// TABULEIRO TÁTICO v0.8.2
+// ============================================================
+// O tabuleiro é deliberadamente uma camada de posicionamento. Ele não converte
+// quadrados em metros e não gasta PA automaticamente, preservando o alcance
+// narrativo já usado pelo sistema. O estado estruturado de paredes já permite
+// adicionar validação de movimento no futuro sem refazer os mapas.
+function safeJsonList(value) {
+  return Array.isArray(value) ? value.map(v=>String(v)) : [];
+}
+
+function boardCellKey(x,y) { return `${Number(x)}:${Number(y)}`; }
+
+// Paredes são normalizadas por LINHA da grade, não duplicadas por quadrado.
+// h:x:y = segmento horizontal de x..x+1 na altura y
+// v:x:y = segmento vertical de y..y+1 na coluna x
+function boardWallKey(x,y,dir) {
+  const xx=Number(x), yy=Number(y);
+  if(dir==='N') return `h:${xx}:${yy}`;
+  if(dir==='S') return `h:${xx}:${yy+1}`;
+  if(dir==='W') return `v:${xx}:${yy}`;
+  if(dir==='E') return `v:${xx+1}:${yy}`;
+  return '';
+}
+
+function boardColumnLabel(index) {
+  let n=Number(index)+1, out='';
+  while(n>0){n-=1;out=String.fromCharCode(65+(n%26))+out;n=Math.floor(n/26);}
+  return out;
+}
+
+function boardEntityLabel(type='') {
+  return COMBAT_ENTITY_GROUPS.find(g=>g.key===type)?.title?.replace(/s$/,'') || 'Entidade';
+}
+
+function boardTokensFromMasterParticipants(participants=[], getName=(c)=>c?.first_name||'Entidade') {
+  return participants.map(p=>({
+    participant_id:p.id,
+    character_id:p.character_id,
+    display_name:getName(p.characters),
+    entity_type:p.characters?.entity_type||'npc',
+    initiative:Number(p.initiative||0),
+    defeated:Boolean(p.defeated),
+    side_key:p.side_key||'neutral',
+    visible_to_players:p.visible_to_players!==false,
+    targetable_by_players:p.targetable_by_players!==false,
+    board_x:p.board_x==null?null:Number(p.board_x),
+    board_y:p.board_y==null?null:Number(p.board_y),
+  }));
+}
+
+function combatBoardTokenHtml(token,{esc=(v)=>String(v),editable=false,activeParticipantId=null,palette=false}={}) {
+  const name=token.display_name||'Entidade';
+  const initials=name.split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0]?.toUpperCase()||'').join('')||'?';
+  const active=String(token.participant_id||'')===String(activeParticipantId||'');
+  const hidden=token.visible_to_players===false;
+  const noTarget=token.targetable_by_players===false;
+  const pos=token.board_x==null||token.board_y==null?'fora do plano':`${boardColumnLabel(token.board_x)}${token.board_y+1}`;
+  return `<button type="button" class="combat-board-token entity-type-${esc(token.entity_type||'npc')} ${active?'turn-active':''} ${hidden?'is-hidden-token':''} ${noTarget?'not-targetable-token':''} ${palette?'is-palette-token':''}" data-board-token="${token.participant_id}" ${editable?'draggable="true"':''} title="${esc(name)} • ${esc(boardEntityLabel(token.entity_type))} • Iniciativa ${Number(token.initiative||0)} • ${esc(pos)}${hidden?' • oculto dos players':''}${noTarget?' • não é alvo válido':''}">
+    <span class="combat-board-token-initials">${esc(initials)}</span><span class="combat-board-token-name">${esc(name)}</span>${active?'<span class="combat-board-token-turn">TURNO</span>':''}
+  </button>`;
+}
+
+function combatBoardHtml({encounter,tokens=[],esc=(v)=>String(v),editable=false,activeParticipantId=null}={}) {
+  const cols=Math.max(4,Math.min(30,Number(encounter?.board_cols||14)));
+  const rows=Math.max(4,Math.min(30,Number(encounter?.board_rows||10)));
+  const blocked=new Set(safeJsonList(encounter?.board_blocked_cells));
+  const walls=new Set(safeJsonList(encounter?.board_walls));
+  const positioned=tokens.filter(t=>t.board_x!=null&&t.board_y!=null&&t.board_x>=0&&t.board_y>=0&&t.board_x<cols&&t.board_y<rows);
+  const byCell=new Map();
+  positioned.forEach(t=>{const key=boardCellKey(t.board_x,t.board_y);if(!byCell.has(key))byCell.set(key,[]);byCell.get(key).push(t);});
+  const ordered=[...tokens].sort((a,b)=>Number(b.initiative||0)-Number(a.initiative||0)||String(a.display_name||'').localeCompare(String(b.display_name||''),'pt-BR'));
+  const cells=[];
+  for(let y=0;y<rows;y++){
+    for(let x=0;x<cols;x++){
+      const key=boardCellKey(x,y), here=byCell.get(key)||[];
+      const wallClasses=['N','E','S','W'].filter(dir=>walls.has(boardWallKey(x,y,dir))).map(dir=>`wall-${dir.toLowerCase()}`).join(' ');
+      cells.push(`<div class="combat-board-cell ${blocked.has(key)?'is-blocked':''} ${wallClasses}" data-board-cell="${key}" data-board-x="${x}" data-board-y="${y}" title="${boardColumnLabel(x)}${y+1}${blocked.has(key)?' • intransponível':''}"><span class="combat-board-coordinate">${boardColumnLabel(x)}${y+1}</span><div class="combat-board-cell-tokens">${here.map(t=>combatBoardTokenHtml(t,{esc,editable,activeParticipantId})).join('')}</div></div>`);
+    }
+  }
+  const publicCount=tokens.filter(t=>t.visible_to_players!==false).length;
+  const placedCount=positioned.length;
+  return `<section class="card combat-board-card" data-combat-board>
+    <div class="combat-board-heading"><div><div class="eyebrow">PLANO DE COMBATE</div><h2 style="margin:2px 0 4px">Posicionamento da cena</h2><div class="muted small">${cols} × ${rows} quadrados • ${placedCount}/${tokens.length} peça(s) posicionada(s)${editable?` • ${publicCount} visível(is) aos players`:''}</div></div>${editable?`<div class="combat-board-modes"><button type="button" class="btn primary" data-board-mode="move">Mover peças</button><button type="button" class="btn" data-board-mode="terrain">Editar terreno</button></div>`:''}</div>
+    ${editable?`<div class="notice combat-board-help"><strong>Mover peças:</strong> arraste qualquer peça da lista para um quadrado, ou clique na peça e depois no destino. <strong>Editar terreno:</strong> selecione um quadrado para bloqueá-lo ou marcar paredes nas quatro bordas. Essas marcações não gastam PA e podem ser alteradas a qualquer momento.</div>`:'<div class="notice combat-board-help">O plano mostra apenas participantes que o Mestre tornou visíveis. A posição é referência espacial da cena; quadrados não equivalem automaticamente a metros ou PA.</div>'}
+    ${editable?`<div class="combat-board-roster"><div class="combat-board-roster-title"><strong>Peças do combate</strong><span class="muted small">Arraste da iniciativa para o plano.</span></div><div class="combat-board-roster-list">${ordered.map(t=>combatBoardTokenHtml(t,{esc,editable:true,activeParticipantId,palette:true})).join('')||'<span class="muted">Nenhuma peça.</span>'}</div></div>`:''}
+    <div class="combat-board-scroll"><div class="combat-board-grid" style="--combat-board-cols:${cols}">${cells.join('')}</div></div>
+    ${editable?`<div class="combat-board-editor" data-board-editor>
+      <div><strong data-board-editor-title>Nenhum quadrado selecionado</strong><div class="muted small" data-board-editor-help>No modo Terreno, clique em um quadrado.</div></div>
+      <div class="btn-row combat-board-terrain-buttons"><button type="button" class="btn" data-board-block disabled>Bloquear quadrado</button><button type="button" class="btn" data-board-wall="N" disabled>Parede ↑</button><button type="button" class="btn" data-board-wall="E" disabled>Parede →</button><button type="button" class="btn" data-board-wall="S" disabled>Parede ↓</button><button type="button" class="btn" data-board-wall="W" disabled>Parede ←</button><button type="button" class="btn warn" data-board-unplace disabled>Retirar peça selecionada</button><button type="button" class="btn bad" data-board-clear-terrain>Limpar terreno</button></div>
+    </div>`:''}
+  </section>`;
+}
+
+function bindMasterCombatBoard(root, encounter, tokens, ctx, rerender) {
+  const board=root.querySelector('[data-combat-board]'); if(!board)return;
+  const { state, withBusy, toast }=ctx;
+  let mode=state.combatBoardMode||'move';
+  let selectedParticipantId=state.combatBoardSelectedParticipant||null;
+  let selectedCell=state.combatBoardSelectedCell||null;
+  const blocked=new Set(safeJsonList(encounter.board_blocked_cells));
+  const walls=new Set(safeJsonList(encounter.board_walls));
+
+  const modeButtons=[...board.querySelectorAll('[data-board-mode]')];
+  const cellEls=[...board.querySelectorAll('[data-board-cell]')];
+  const tokenEls=[...board.querySelectorAll('[data-board-token]')];
+  const title=board.querySelector('[data-board-editor-title]');
+  const help=board.querySelector('[data-board-editor-help]');
+  const blockBtn=board.querySelector('[data-board-block]');
+  const wallBtns=[...board.querySelectorAll('[data-board-wall]')];
+  const unplaceBtn=board.querySelector('[data-board-unplace]');
+
+  const sync=()=>{
+    state.combatBoardMode=mode;
+    state.combatBoardSelectedParticipant=selectedParticipantId;
+    state.combatBoardSelectedCell=selectedCell;
+    modeButtons.forEach(btn=>btn.classList.toggle('primary',btn.dataset.boardMode===mode));
+    board.classList.toggle('terrain-mode',mode==='terrain');
+    tokenEls.forEach(el=>el.classList.toggle('is-selected-token',String(el.dataset.boardToken)===String(selectedParticipantId||'')));
+    cellEls.forEach(el=>el.classList.toggle('is-selected-cell',String(el.dataset.boardCell)===String(selectedCell||'')));
+    const hasCell=Boolean(selectedCell&&mode==='terrain');
+    if(blockBtn)blockBtn.disabled=!hasCell;
+    wallBtns.forEach(btn=>btn.disabled=!hasCell);
+    if(unplaceBtn)unplaceBtn.disabled=!selectedParticipantId;
+    if(hasCell){
+      const [x,y]=selectedCell.split(':').map(Number);
+      if(title)title.textContent=`Quadrado ${boardColumnLabel(x)}${y+1}`;
+      if(help)help.textContent=blocked.has(selectedCell)?'Quadrado intransponível. Clique novamente para liberar.':'Quadrado transitável.';
+      if(blockBtn){blockBtn.textContent=blocked.has(selectedCell)?'Desbloquear quadrado':'Bloquear quadrado';blockBtn.classList.toggle('warn',blocked.has(selectedCell));}
+      wallBtns.forEach(btn=>btn.classList.toggle('warn',walls.has(boardWallKey(x,y,btn.dataset.boardWall))));
+    }else{
+      if(title)title.textContent=mode==='move'?(selectedParticipantId?'Peça selecionada':'Selecione uma peça para mover'):'Nenhum quadrado selecionado';
+      if(help)help.textContent=mode==='move'?'Arraste uma peça ou clique nela e depois no destino.':'Clique em um quadrado para editar paredes e bloqueio.';
+    }
+  };
+
+  const move=async(participantId,x,y)=>{
+    if(!participantId)return;
+    const key=boardCellKey(x,y);
+    if(blocked.has(key)){toast('Este quadrado está marcado como intransponível.','bad');return;}
+    const token=tokens.find(t=>String(t.participant_id)===String(participantId));
+    await withBusy(()=>api.moveCombatToken(encounter.id,participantId,x,y,`Mover ${token?.display_name||'peça'} no tabuleiro`),'Peça reposicionada.');
+    await rerender();
+  };
+
+  modeButtons.forEach(btn=>btn.onclick=()=>{mode=btn.dataset.boardMode;selectedCell=null;sync();});
+  tokenEls.forEach(el=>{
+    el.addEventListener('click',e=>{if(mode!=='move')return;e.stopPropagation();selectedParticipantId=el.dataset.boardToken;sync();});
+    el.addEventListener('dragstart',e=>{if(mode!=='move'){e.preventDefault();return;}selectedParticipantId=el.dataset.boardToken;e.dataTransfer?.setData('text/combat-participant',selectedParticipantId);e.dataTransfer.effectAllowed='move';sync();});
+  });
+  cellEls.forEach(cell=>{
+    cell.addEventListener('dragover',e=>{if(mode==='move'){e.preventDefault();if(e.dataTransfer)e.dataTransfer.dropEffect='move';}});
+    cell.addEventListener('drop',async e=>{if(mode!=='move')return;e.preventDefault();const pid=e.dataTransfer?.getData('text/combat-participant')||selectedParticipantId;await move(pid,Number(cell.dataset.boardX),Number(cell.dataset.boardY));});
+    cell.addEventListener('click',async e=>{
+      if(e.target.closest('[data-board-token]'))return;
+      if(mode==='move'){
+        if(!selectedParticipantId){toast('Selecione uma peça da iniciativa primeiro.','bad');return;}
+        await move(selectedParticipantId,Number(cell.dataset.boardX),Number(cell.dataset.boardY));
+      }else{
+        selectedCell=cell.dataset.boardCell; sync();
+      }
+    });
+  });
+  blockBtn?.addEventListener('click',async()=>{
+    if(!selectedCell)return;
+    if(blocked.has(selectedCell))blocked.delete(selectedCell);else blocked.add(selectedCell);
+    await withBusy(()=>api.setCombatBoardState(encounter.id,{blockedCells:[...blocked],walls:[...walls]}),blocked.has(selectedCell)?'Quadrado bloqueado.':'Quadrado liberado.');
+    await rerender();
+  });
+  wallBtns.forEach(btn=>btn.onclick=async()=>{
+    if(!selectedCell)return;
+    const [x,y]=selectedCell.split(':').map(Number);const key=boardWallKey(x,y,btn.dataset.boardWall);
+    if(walls.has(key))walls.delete(key);else walls.add(key);
+    await withBusy(()=>api.setCombatBoardState(encounter.id,{blockedCells:[...blocked],walls:[...walls]}),walls.has(key)?'Parede marcada.':'Parede removida.');
+    await rerender();
+  });
+  unplaceBtn?.addEventListener('click',async()=>{
+    if(!selectedParticipantId)return;
+    const token=tokens.find(t=>String(t.participant_id)===String(selectedParticipantId));
+    await withBusy(()=>api.moveCombatToken(encounter.id,selectedParticipantId,null,null,`Retirar ${token?.display_name||'peça'} do tabuleiro`),'Peça retirada do plano.');
+    selectedParticipantId=null;state.combatBoardSelectedParticipant=null;await rerender();
+  });
+  board.querySelector('[data-board-clear-terrain]')?.addEventListener('click',async()=>{
+    if(!confirm('Remover TODOS os quadrados bloqueados e paredes deste combate? As posições das peças serão mantidas.'))return;
+    await withBusy(()=>api.setCombatBoardState(encounter.id,{blockedCells:[],walls:[]}),'Terreno limpo.');
+    selectedCell=null;state.combatBoardSelectedCell=null;await rerender();
+  });
+  sync();
+}
+
 async function loadAbilityBundle(parentCharacterId) {
   const parentAbilities=await safeCombatRead('habilidades do personagem',()=>api.getAbilities(parentCharacterId),[]);
   const children=await safeCombatRead('fichas filhas',()=>api.getChildSheets(parentCharacterId),[]);
@@ -592,6 +782,7 @@ export async function renderPlayerCombatPageV2(ctx) {
 
   root.innerHTML=`${pageHeader(`Rodada ${active.round}`,'Combate')}
     ${turnBanner}<div style="height:14px"></div>
+    ${combatBoardHtml({encounter:active,tokens:targets,esc,editable:false,activeParticipantId:active.active_participant_id})}<div style="height:14px"></div>
     <section class="grid grid-2"><div class="card"><h2>${esc(active.name)}</h2>${mine?participantCard(mine,ctx,false,active.active_participant_id,caMap):'<p class="muted">Seu personagem ainda não foi adicionado.</p>'}${mine?`<h3 style="margin-top:12px">Recursos especiais</h3>${specialResourcesHtml(mine,esc,isMyTurn)}<h3 style="margin-top:12px">Efeitos ativos</h3><div>${combatEffectsHtml(effects,state.character.id,esc,{ownTurn:isMyTurn,prefix:'player'})}</div>`:''}<h3 style="margin-top:14px">Ordem de iniciativa visível</h3>${playerInitiativeHtml(targets,active.active_participant_id,esc)}</div>
     <div class="card"><h2>Golpe corpo a corpo</h2>${mine&&targetOpts&&isMyTurn?`<form id="basic-attack" class="grid"><label>Alvo<select name="target">${targetOpts}</select></label><label style="display:flex;align-items:center;gap:7px"><input name="cursed" type="checkbox" style="width:auto" /> Conduzir +1 EA neste golpe • permite Kokusen em 20 natural</label>${modeFields('')}<div class="notice">1 PA • Força + Lutar • dano 1d6 + Mod. Força</div><button class="btn primary">Atacar</button></form>`:mine&&targetOpts?'<div class="notice">Aguardando o Mestre iniciar seu turno.</div>':'<p class="muted">É preciso estar no combate e possuir um alvo.</p>'}</div></section>
     <div style="height:14px"></div>
@@ -668,6 +859,7 @@ export async function renderMasterCombatPageV2(ctx) {
   state.encounterParticipants=participants;
   const caMap=Object.fromEntries(targets.map(t=>[t.character_id,t.ca]));
   const inCombat=new Set(participants.map(p=>p.character_id));
+  const boardTokens=boardTokensFromMasterParticipants(participants,getName);
   const activeParticipant=participants.find(p=>p.id===active.active_participant_id)||null;
   const actor=activeParticipant?.characters||null;
   const actorName=actor?getName(actor):'';
@@ -715,6 +907,8 @@ export async function renderMasterCombatPageV2(ctx) {
     <section class="card combat-master-controls"><div class="btn-row"><div><strong>${esc(active.name)}</strong><div class="muted small">${activeParticipant?`Turno iniciado para ${esc(actorName)}.`:'Nenhum turno ativo.'}</div>${lastUndo?`<div class="muted small" style="margin-top:4px">Última ação desfazível: <strong>${esc(lastUndo.label)}</strong></div>`:'<div class="muted small" style="margin-top:4px">Ainda não há ação para desfazer.</div>'}</div><div class="btn-row"><button class="btn warn" id="undo-combat" ${lastUndo?'':'disabled'}>Desfazer última ação</button><button class="btn bad" id="end-encounter">Encerrar combate</button></div></div></section>
     <div style="height:14px"></div><section class="card">${turnStatus}</section>
     <div style="height:14px"></div>
+    ${combatBoardHtml({encounter:active,tokens:boardTokens,esc,editable:true,activeParticipantId:active.active_participant_id})}
+    <div style="height:14px"></div>
     <section class="grid grid-2"><div class="card"><h2>Participantes</h2><div class="list">${participants.map(p=>participantCard(p,ctx,true,active.active_participant_id,caMap)).join('')||'<p class="muted">Vazio.</p>'}</div><div class="combat-add-controls"><button class="btn primary" id="toggle-add-combat">+ Adicionar personagens ao combate</button><div id="add-combat-panel" hidden><h3>Adicionar durante o combate</h3>${combatEntityPickerHtml(state.masterCharacters,inCombat,esc,getName,'add')}<button class="btn good" id="add-selected-combat" style="margin-top:10px">Adicionar selecionados</button></div></div></div>
     <div class="card"><h2>Ações do turno</h2>${actor?`<div class="list-item"><div class="title">${esc(actorName)}</div>${specialResourcesHtml(activeParticipant,esc,true,'master-resource')}<div style="margin-top:8px">${combatEffectsHtml(effects,actor.id,esc,{ownTurn:true,prefix:'master'})}</div></div><form id="master-basic" class="grid" style="margin-top:10px"><h3>Golpe corpo a corpo</h3><label>Alvo<select name="target">${masterAttackTargetOpts}</select></label><label style="display:flex;align-items:center;gap:7px"><input name="cursed" type="checkbox" style="width:auto" /> Conduzir +1 EA</label><button class="btn bad">Atacar em segredo</button></form><hr style="border-color:#333"><form id="master-skill" class="grid"><h3>Teste secreto</h3><label>Perícia<select name="skill">${optionList(SKILLS)}</select></label>${modeFields('')}<button class="btn bad">Rolar em segredo</button></form>`:'<div class="notice">Nenhuma entidade pode realizar ação normal até você iniciar um turno.</div>'}</div></section>
     ${actor?`<div style="height:14px"></div><section class="grid grid-2"><div class="card"><h2>Habilidades de ${esc(actorName)}</h2><div class="list">${actorAbilityCards.join('')||'<p class="muted">Nenhuma habilidade aprovada.</p>'}</div>${actorBundle.children.length?`<div class="list" style="margin-top:10px">${actorBundle.children.map(({child})=>{const on=child.id===activeSummonId;return `<div class="list-item"><div class="btn-row"><div class="title">${esc(getName(child))}</div><span class="pill ${on?'good':'bad'}">${on?'ATIVA':'INATIVA'}</span>${on?`<button class="btn warn" data-master-dismiss-summon="${child.id}" data-summon-name="${esc(getName(child))}">Dispensar</button>`:''}</div></div>`}).join('')}</div>`:''}</div>
@@ -723,6 +917,7 @@ export async function renderMasterCombatPageV2(ctx) {
     <div style="height:14px"></div><section class="card"><h2>Ações e reações</h2><div class="list">${actions.map(a=>actionCard(a,ctx)).join('')||'<p class="muted">Nenhuma ação.</p>'}</div></section>`;
 
   bindStructuredAbilityControls(root);
+  bindMasterCombatBoard(root,active,boardTokens,ctx,()=>renderMasterCombatPageV2(ctx));
 
   root.querySelector('#undo-combat')?.addEventListener('click',async()=>{if(!lastUndo)return;if(!confirm(`Desfazer a última ação do combate?\n\n${lastUndo.label}\n\nTudo que essa ação gastou ou causou será restaurado.`))return;const label=await withBusy(()=>api.undoLastCombatAction(active.id),'Ação desfeita.');toast(`Desfeito: ${label}`,'good');renderMasterCombatPageV2(ctx);});
   root.querySelector('#end-encounter')?.addEventListener('click',async()=>{if(!confirm('Encerrar este combate?'))return;await withBusy(()=>api.endEncounter(active.id),'Combate encerrado.');state.activeEncounter=null;state.combatActorId=null;renderMasterCombatPageV2(ctx);});

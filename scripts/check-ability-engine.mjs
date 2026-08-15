@@ -9,7 +9,7 @@ const main=read('src/main.js');
 const css=read('src/styles.css');
 const migration=read('supabase/migrations/202608100004_ability_engine_v08.sql');
 
-assert(SYSTEM_VERSION==='0.8.1','SYSTEM_VERSION precisa ser 0.8.1.');
+assert(SYSTEM_VERSION==='0.8.2','SYSTEM_VERSION precisa ser 0.8.2.');
 
 // O bug da captura: a UI precisa nascer com o campo e também ligar seus eventos
 // depois que o HTML do combate é inserido no DOM, em player e Mestre.
@@ -64,4 +64,4 @@ for(const forbidden of ['demônio','demonio','possessão','possessao']) {
 assert((migration.match(/\$\$/g)||[]).length%2===0,'Migration possui bloco $$ não fechado.');
 assert(!migration.includes('characters(*)'),'Migration não deve reintroduzir embed ambíguo de characters.');
 
-console.log('OK: motor v0.8.1, segundo alvo, relações de alvo, construtor estruturado, rerrolagens e segurança pública validados.');
+console.log('OK: motor v0.8.2, segundo alvo, relações de alvo, construtor estruturado, rerrolagens e segurança pública validados.');
