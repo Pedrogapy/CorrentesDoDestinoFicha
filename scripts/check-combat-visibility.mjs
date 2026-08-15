@@ -1,10 +1,10 @@
-﻿import fs from 'node:fs';
+import fs from 'node:fs';
 import path from 'node:path';
 import { SYSTEM_VERSION, TARGET_RELATIONS } from '../src/lib/system.js';
 import { fileURLToPath } from 'node:url';
 
 function assert(condition,message){ if(!condition){ console.error(`ERRO: ${message}`); process.exit(1); } }
-const root=path.resolve(path.dirname(new URL(import.meta.url).pathname),'..');
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const combat=fs.readFileSync(path.join(root,'src/lib/combat-ui.js'),'utf8');
 const api=fs.readFileSync(path.join(root,'src/lib/api.js'),'utf8');
 const sql=fs.readFileSync(path.join(root,'supabase/migrations/202608100005_combat_visibility_targeting.sql'),'utf8');
