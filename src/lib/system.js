@@ -9,7 +9,7 @@
  * - Não expor sistemas narrativamente secretos em telas de jogador apenas por estarem implementados no banco.
  */
 
-export const SYSTEM_VERSION = '0.8.2';
+export const SYSTEM_VERSION = '0.8.3';
 
 export const ATTRIBUTES = [
   {

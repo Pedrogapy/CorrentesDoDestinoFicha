@@ -204,3 +204,12 @@ Regras canônicas implementadas no site:
 - Mover token usa o motor de Undo. Edição de terreno fica fora do Undo para não sobrescrever a última ação mecânica.
 - `move_combat_token` e `set_combat_board_state` são `security definer` com checagem explícita de Mestre.
 - Trigger impede players de alterar `board_x/board_y` por request manual.
+
+## v0.8.3 — dados físicos opcionais
+
+- Players escolhem por rolagem entre site e dados físicos.
+- d20 físico usa valor natural; bônus continuam automáticos.
+- Vantagem/desvantagem recebe cada d20.
+- Dano/cura aceita cada dado ou a soma dos dados sem modificadores.
+- Ataques guardam dano físico até a reação do alvo.
+- Rolagens automáticas sem clique do player continuam digitais.

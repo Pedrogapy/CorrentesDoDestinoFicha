@@ -874,3 +874,33 @@ export async function removeCombatCondition(participantId, conditionKey, encount
     return data;
   });
 }
+
+
+// ============================================================
+// DADOS FÍSICOS OPCIONAIS v0.8.3
+// ============================================================
+export async function setManualDiceQueue(tokens=[]) {
+  const { error } = await supabase.rpc('set_manual_dice_queue', { p_queue: Array.isArray(tokens) ? tokens : [] });
+  if (error) throw error;
+}
+export async function clearManualDiceQueue() {
+  const { error } = await supabase.rpc('clear_manual_dice_queue');
+  if (error) throw error;
+}
+export async function markPhysicalAttack(actionId) {
+  const { error } = await supabase.rpc('mark_physical_attack', { p_action_id: actionId });
+  if (error) throw error;
+}
+export async function getPhysicalAttackPrompt(actionId) {
+  const { data, error } = await supabase.rpc('get_physical_attack_prompt', { p_action_id: actionId });
+  if (error) throw error;
+  return data;
+}
+export async function setPhysicalAttackDamage(actionId,tokens=[]) {
+  const { error } = await supabase.rpc('set_physical_attack_damage', { p_action_id: actionId, p_queue: Array.isArray(tokens) ? tokens : [] });
+  if (error) throw error;
+}
+export async function useDigitalAttackDamage(actionId) {
+  const { error } = await supabase.rpc('use_digital_attack_damage', { p_action_id: actionId });
+  if (error) throw error;
+}

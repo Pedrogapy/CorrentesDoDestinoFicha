@@ -1,6 +1,7 @@
 import * as api from './api.js';
 import { ATTRIBUTES, SKILLS, ATTRIBUTE_BY_KEY, SKILL_BY_KEY, characterDerived, weaponDamageProfile } from './system.js';
 import { equipmentEffectCombatDefaults } from './equipment-ui.js';
+import { chooseD20Roll, chooseAbilityRoll, chooseEquipmentEffectRoll, chooseResourceRechargeRoll, chooseBombRoll, findRechargeConfig, runWithRollChoice, finishPhysicalAttack } from './manual-dice.js';
 
 const COMBAT_ENTITY_GROUPS = [
   { key:'player', title:'Players', cls:'player' },
@@ -223,17 +224,45 @@ function participantCard(p, ctx, editable=false, activeParticipantId=null, caMap
 }
 
 async function bindCommonCombatButtons(root, ctx, encounterId, rerender) {
-  const { toast, withBusy }=ctx;
+  const { toast, withBusy, state }=ctx;
+  const playerOwnsRoll=state.profile.role!=='master';
   root.querySelectorAll('[data-defense]').forEach(btn=>btn.onclick=async()=>{
     const actionId=btn.dataset.action; const type=btn.dataset.defense;
-    await withBusy(()=>api.resolveCombatDefense(actionId,type,'normal',1,encounterId),type==='accept'?'Golpe resolvido.':'Reação resolvida.');
-    rerender();
+    if(type==='accept' || !playerOwnsRoll){
+      await withBusy(()=>api.resolveCombatDefense(actionId,type,'normal',1,encounterId),type==='accept'?'Golpe resolvido.':'Reação resolvida.');
+      rerender(); return;
+    }
+    const title=type==='dodge'?'Esquivar':type==='defend'?'Defender':type==='reinforce'?'Reforçar':'Resistir';
+    const choice=await chooseD20Roll({title,mode:'normal',count:1,label:'Defesa',details:'Role 1d20 natural. O site soma automaticamente o bônus defensivo correto.'});
+    const executed=await runWithRollChoice(choice,()=>withBusy(()=>api.resolveCombatDefense(actionId,type,'normal',1,encounterId),'Reação resolvida.'));
+    if(!executed.cancelled) rerender();
   });
   root.querySelectorAll('[data-counter]').forEach(btn=>btn.onclick=async()=>{
     const id=btn.dataset.counter; const useEA=Boolean(root.querySelector(`[data-counter-ea="${id}"]`)?.checked);
-    await withBusy(()=>api.createBasicCounterattack(id,useEA,encounterId),'Contra-ataque realizado.');rerender();
+    let mode='normal',count=1;
+    if(playerOwnsRoll){
+      const participants=await api.getCombatParticipants(encounterId);
+      const mine=participants.find(p=>String(p.character_id)===String(state.character?.id));
+      count=Math.max(1,Number(mine?.counterattack_count||0)+1);
+      mode=count>1?'disadvantage':'normal';
+    }
+    const choice=playerOwnsRoll
+      ? await chooseD20Roll({title:'Contra-ataque',mode,count,label:'Ataque',details:count>1?`Este é o ${count}º contra-ataque antes do próximo turno: use o menor d20.`:'Role o d20 natural. O site soma Força + Lutar e demais bônus.'})
+      : {source:'digital',tokens:[]};
+    const executed=await runWithRollChoice(choice,()=>withBusy(()=>api.createBasicCounterattack(id,useEA,encounterId),'Contra-ataque realizado.'));
+    if(executed.cancelled)return;
+    if(choice?.source==='physical') await finishPhysicalAttack(executed.value,'Dano do contra-ataque');
+    rerender();
   });
-  root.querySelectorAll('[data-roll-init]').forEach(btn=>btn.onclick=async()=>{const total=await withBusy(()=>api.rollCombatInitiative(btn.dataset.rollInit,encounterId));toast(`Iniciativa: ${total}`,'good');rerender();});
+  root.querySelectorAll('[data-roll-init]').forEach(btn=>btn.onclick=async()=>{
+    if(!playerOwnsRoll){
+      const total=await withBusy(()=>api.rollCombatInitiative(btn.dataset.rollInit,encounterId));
+      toast(`Iniciativa: ${total}`,'good'); rerender(); return;
+    }
+    const choice=await chooseD20Roll({title:'Iniciativa',mode:'normal',count:1,label:'Iniciativa',details:'Informe o d20 natural. Destreza + Reflexos são aplicados pelo sistema.'});
+    const executed=await runWithRollChoice(choice,()=>withBusy(()=>api.rollCombatInitiative(btn.dataset.rollInit,encounterId),'Iniciativa registrada.'));
+    if(!executed.cancelled){toast(`Iniciativa: ${executed.value}`,'good');rerender();}
+  });
   root.querySelectorAll('[data-start-turn]').forEach(btn=>btn.onclick=async()=>{
     const name=btn.dataset.turnName||'';
     await withBusy(()=>api.startCombatTurn(btn.dataset.startTurn,encounterId,name),name?`Sua vez, ${name}.`:'Turno iniciado.');
@@ -244,9 +273,11 @@ async function bindCommonCombatButtons(root, ctx, encounterId, rerender) {
     await withBusy(()=>api.endCombatTurn(btn.dataset.endTurn,encounterId,name),'Turno encerrado.');
     rerender();
   });
-  root.querySelectorAll('[data-remove-condition]').forEach(btn=>btn.onclick=async()=>{await withBusy(()=>api.removeCombatCondition(btn.dataset.removeCondition,btn.dataset.condition,encounterId),'Condição removida.');rerender();});
+  root.querySelectorAll('[data-remove-condition]').forEach(btn=>btn.onclick=async()=>{
+    await withBusy(()=>api.removeCombatCondition(btn.dataset.removeCondition,btn.dataset.condition,encounterId),'Condição removida.');
+    rerender();
+  });
 }
-
 
 function mergedModeConfig(source, modeKey=null) {
   const base={...(source?.config||{})};
@@ -703,21 +734,35 @@ export async function renderTestsPage(ctx) {
       <label>Perícia<select name="skill">${optionList(SKILLS)}</select></label>
       <label>Atributo<select name="attribute"><option value="">Atributo padrão da perícia</option>${optionList(ATTRIBUTES)}</select></label>
       ${modeFields('')}
-      <button class="btn primary">Rolar teste</button>
-    </form><div class="notice" style="margin-top:10px">Fora de combate, o teste ainda é registrado. Rolagens feitas pelo Mestre permanecem secretas.</div></div>
+      <button class="btn primary">Fazer teste</button>
+    </form><div class="notice" style="margin-top:10px">Players podem escolher entre rolar pelo site ou usar dados físicos. O d20 informado é o valor natural; o sistema aplica o bônus.</div></div>
     <div class="card"><h2>Histórico de testes</h2><div class="list">${logs.map(r=>`<div class="list-item"><div class="title">${esc(r.label)}: ${r.total}</div><div class="meta">${esc(r.expression)} • ${esc(JSON.stringify(r.rolls))} • bônus ${r.bonus>=0?'+':''}${r.bonus}</div></div>`).join('')||'<p class="muted">Nenhuma rolagem.</p>'}</div></div></section>`;
   root.querySelector('#general-test').onsubmit=async e=>{
-    e.preventDefault(); const f=new FormData(e.currentTarget); const characterId=state.profile.role==='master'?f.get('character'):state.character.id;
-    const skill=SKILL_BY_KEY[f.get('skill')]; const attributeKey=f.get('attribute')||skill.attribute; const mode=f.get('mode'); const count=Number(f.get('count')||2);
-    const result=await withBusy(()=>api.rollGeneralTest({characterId,label:skill.name,attributeKey,skillKey:skill.key,mode,count,visibility:state.profile.role==='master'?'master':'public'}));
-    toast(`${skill.name}: ${result.total}`,'good'); renderTestsPage(ctx);
+    e.preventDefault();
+    const f=new FormData(e.currentTarget);
+    const characterId=state.profile.role==='master'?f.get('character'):state.character.id;
+    const skill=SKILL_BY_KEY[f.get('skill')];
+    const attributeKey=f.get('attribute')||skill.attribute;
+    const mode=f.get('mode'); const count=Number(f.get('count')||2);
+    if(state.profile.role==='master'){
+      const result=await withBusy(()=>api.rollGeneralTest({characterId,label:skill.name,attributeKey,skillKey:skill.key,mode,count,visibility:'master'}));
+      toast(`${skill.name}: ${result.total}`,'good');renderTestsPage(ctx);return;
+    }
+    const choice=await chooseD20Roll({title:`Teste de ${skill.name}`,mode,count,label:skill.name,details:'Informe somente o(s) d20 natural(is). O site calcula atributo, perícia e bônus válidos.'});
+    const executed=await runWithRollChoice(choice,()=>withBusy(()=>api.rollGeneralTest({characterId,label:skill.name,attributeKey,skillKey:skill.key,mode,count,visibility:'public'}),'Teste registrado.'));
+    if(!executed.cancelled){toast(`${skill.name}: ${executed.value.total}`,'good');renderTestsPage(ctx);}
   };
 }
-
 export async function quickSkillRoll(character, skillKey, ctx) {
   const { toast, withBusy, state }=ctx; const skill=SKILL_BY_KEY[skillKey];
-  const result=await withBusy(()=>api.rollGeneralTest({characterId:character.id,label:skill.name,attributeKey:skill.attribute,skillKey:skill.key,mode:'normal',count:1,visibility:state.profile.role==='master'?'master':'public'}));
-  toast(`${skill.name}: ${result.total}`,'good'); return result;
+  if(state.profile.role==='master'){
+    const result=await withBusy(()=>api.rollGeneralTest({characterId:character.id,label:skill.name,attributeKey:skill.attribute,skillKey:skill.key,mode:'normal',count:1,visibility:'master'}));
+    toast(`${skill.name}: ${result.total}`,'good'); return result;
+  }
+  const choice=await chooseD20Roll({title:`Teste de ${skill.name}`,mode:'normal',count:1,label:skill.name,details:'Informe o d20 natural; o bônus da ficha é somado automaticamente.'});
+  const executed=await runWithRollChoice(choice,()=>withBusy(()=>api.rollGeneralTest({characterId:character.id,label:skill.name,attributeKey:skill.attribute,skillKey:skill.key,mode:'normal',count:1,visibility:'public'}),'Teste registrado.'));
+  if(executed.cancelled)return null;
+  toast(`${skill.name}: ${executed.value.total}`,'good'); return executed.value;
 }
 
 export async function renderPlayerCombatPageV2(ctx) {
@@ -794,29 +839,81 @@ export async function renderPlayerCombatPageV2(ctx) {
   // a Sobrecarga de A Linha Que Separa não exibiria o campo de segundo alvo.
   bindStructuredAbilityControls(root);
 
-  root.querySelector('#basic-attack')?.addEventListener('submit',async e=>{e.preventDefault();const fd=new FormData(e.currentTarget);await withBusy(()=>api.createCombatAttack({encounterId:active.id,attackerCharacterId:state.character.id,targetCharacterId:fd.get('target'),label:'Golpe corpo a corpo',sourceType:'basic',attackAttributeKey:'strength',attackSkillKey:'fight',paCost:1,eaCost:fd.get('cursed')==='on'?1:0,usesCursedEnergy:fd.get('cursed')==='on',damageDiceCount:1,damageDie:6,damageFlatAttributeKey:'strength',rollMode:fd.get('mode'),rollCount:Number(fd.get('count')||2)}),'Ataque realizado.');renderPlayerCombatPageV2(ctx);});
+root.querySelector('#basic-attack')?.addEventListener('submit',async e=>{
+    e.preventDefault();
+    const fd=new FormData(e.currentTarget);const mode=fd.get('mode');const count=Number(fd.get('count')||2);
+    const choice=await chooseD20Roll({title:'Golpe corpo a corpo',mode,count,label:'Ataque',details:'Role o(s) d20 natural(is). Força + Lutar e bônus do combate são somados automaticamente.'});
+    const executed=await runWithRollChoice(choice,()=>withBusy(()=>api.createCombatAttack({encounterId:active.id,attackerCharacterId:state.character.id,targetCharacterId:fd.get('target'),label:'Golpe corpo a corpo',sourceType:'basic',attackAttributeKey:'strength',attackSkillKey:'fight',paCost:1,eaCost:fd.get('cursed')==='on'?1:0,usesCursedEnergy:fd.get('cursed')==='on',damageDiceCount:1,damageDie:6,damageFlatAttributeKey:'strength',rollMode:mode,rollCount:count}),'Ataque realizado.'));
+    if(executed.cancelled)return;
+    if(choice?.source==='physical')await finishPhysicalAttack(executed.value,'Dano do golpe corpo a corpo');
+    renderPlayerCombatPageV2(ctx);
+  });
 
   root.querySelectorAll('[data-ability-use]').forEach(btn=>btn.onclick=async()=>{
     const abilityId=btn.dataset.abilityId; const modeKey=btn.dataset.modeKey||null;
     const a=[...approvedAbilities,...bundle.children.flatMap(x=>x.abilities)].find(x=>x.id===abilityId); if(!a)return;
     const cfg=mergedModeConfig(a,modeKey); const key=`${a.id}:${modeKey||'base'}`;
     const overload=root.querySelector(`[data-overload="${CSS.escape(key)}"]`)?.value||null;
-    const special=cfg.special_action||'';
-    const target=(isSelfTarget(cfg)||['set_combat_mode','boost_recent_attack','place_delayed_bomb'].includes(special))?state.character.id:root.querySelector(`[data-ability-target="${CSS.escape(key)}"]`)?.value;
+    let effectiveCfg={...cfg};
+    if(overload){const selectedOverload=(Array.isArray(cfg.overloads)?cfg.overloads:[]).find(o=>String(o.key)===String(overload));if(selectedOverload?.overrides)effectiveCfg={...effectiveCfg,...selectedOverload.overrides};}
+    const special=effectiveCfg.special_action||'';
+    const target=(isSelfTarget(effectiveCfg)||['set_combat_mode','boost_recent_attack','place_delayed_bomb'].includes(special))?state.character.id:root.querySelector(`[data-ability-target="${CSS.escape(key)}"]`)?.value;
     const options={};
-    if(cfg.special_action==='create_weapon') { options.weapon_profile=root.querySelector(`[data-weapon-profile="${CSS.escape(key)}"]`)?.value||'standard'; options.weapon_attribute=root.querySelector(`[data-weapon-attribute="${CSS.escape(key)}"]`)?.value||'strength'; }
-    const multi=root.querySelector(`[data-ability-targets="${CSS.escape(key)}"]`); if(multi) options.target_ids=[...multi.selectedOptions].map(o=>o.value);
-    const recent=root.querySelector(`[data-recent-action="${CSS.escape(key)}"]`); if(recent?.value) options.action_id=recent.value;
-    const secondary=root.querySelector(`[data-secondary-target="${CSS.escape(key)}"]`); if(secondary?.value) options.secondary_target_id=secondary.value;
-    await withBusy(()=>api.useAbilityInCombat({encounterId:active.id,actorCharacterId:state.character.id,abilityId:a.id,targetCharacterId:target,modeKey,overloadKey:overload,options,label:a.name}),'Habilidade usada.');
+    if(effectiveCfg.special_action==='create_weapon'){options.weapon_profile=root.querySelector(`[data-weapon-profile="${CSS.escape(key)}"]`)?.value||'standard';options.weapon_attribute=root.querySelector(`[data-weapon-attribute="${CSS.escape(key)}"]`)?.value||'strength';}
+    const multi=root.querySelector(`[data-ability-targets="${CSS.escape(key)}"]`);if(multi)options.target_ids=[...multi.selectedOptions].map(o=>o.value);
+    const recent=root.querySelector(`[data-recent-action="${CSS.escape(key)}"]`);if(recent?.value)options.action_id=recent.value;
+    const secondary=root.querySelector(`[data-secondary-target="${CSS.escape(key)}"]`);if(secondary?.value)options.secondary_target_id=secondary.value;
+    const choice=await chooseAbilityRoll({title:a.name,cfg:effectiveCfg,options});
+    if(choice===null)return;
+    const executed=await runWithRollChoice(choice,()=>withBusy(()=>api.useAbilityInCombat({encounterId:active.id,actorCharacterId:state.character.id,abilityId:a.id,targetCharacterId:target,modeKey,overloadKey:overload,options,label:a.name}),'Habilidade usada.'));
+    if(executed.cancelled)return;
+    if(choice?.source==='physical'){
+      const result=executed.value||{};
+      if(result.action_id)await finishPhysicalAttack(result.action_id,`Dano — ${a.name}`);
+      if(result.secondary_action_id)await finishPhysicalAttack(result.secondary_action_id,`Dano secundário — ${a.name}`);
+    }
     renderPlayerCombatPageV2(ctx);
   });
-  root.querySelectorAll('[data-resource-recharge]').forEach(btn=>btn.onclick=async()=>{await withBusy(()=>api.useCombatResourceAction(active.id,state.character.id,btn.dataset.resourceRecharge,`Recarregar ${btn.dataset.resourceRecharge}`),'Recurso recarregado.');renderPlayerCombatPageV2(ctx);});
+
+root.querySelectorAll('[data-resource-recharge]').forEach(btn=>btn.onclick=async()=>{
+    const recharge=findRechargeConfig(state.character,btn.dataset.resourceRecharge);
+    const choice=await chooseResourceRechargeRoll({title:`Recarregar ${btn.dataset.resourceRecharge}`,recharge});
+    const executed=await runWithRollChoice(choice,()=>withBusy(()=>api.useCombatResourceAction(active.id,state.character.id,btn.dataset.resourceRecharge,`Recarregar ${btn.dataset.resourceRecharge}`),'Recurso recarregado.'));
+    if(!executed.cancelled)renderPlayerCombatPageV2(ctx);
+  });
   root.querySelectorAll('[data-dismiss-summon]').forEach(btn=>btn.onclick=async()=>{await withBusy(()=>api.dismissCombatSummon(active.id,state.character.id,btn.dataset.summonName),'Invocação dispensada.');renderPlayerCombatPageV2(ctx);});
-  root.querySelectorAll('[data-use-equipment]').forEach(btn=>btn.onclick=async()=>{const i=attackEquipment.find(x=>x.id===btn.dataset.useEquipment);const target=root.querySelector(`[data-equipment-target="${i.id}"]`)?.value;const reinforce=Boolean(root.querySelector(`[data-equipment-reinforce="${i.id}"]`)?.checked);const twoHanded=Boolean(root.querySelector(`[data-equipment-two-hands="${i.id}"]`)?.checked);await withBusy(()=>executeEquipment(i,state.character.id,active.id,target,reinforce,twoHanded),'Ataque realizado.');renderPlayerCombatPageV2(ctx);});
-  root.querySelectorAll('[data-equipment-effect-use]').forEach(btn=>btn.onclick=async()=>{const item=usableEquipment.find(x=>x.id===btn.dataset.itemId);const effect=(item?.effects||[]).find(e=>String(e.id)===String(btn.dataset.effectId));if(!item||!effect)return;const modeKey=btn.dataset.modeKey||null;const cfg=effectVariants(effect).find(v=>(v.modeKey||null)===modeKey)?.config||effect.config||{};const key=`${item.id}:${effect.id}:${modeKey||'base'}`;const target=isSelfTarget(cfg)?state.character.id:root.querySelector(`[data-equipment-effect-target="${CSS.escape(key)}"]`)?.value;await withBusy(()=>api.useEquipmentEffectInCombat({encounterId:active.id,actorCharacterId:state.character.id,itemId:item.id,effectId:effect.id,targetCharacterId:target,modeKey,label:`${item.name}: ${effect.name}`}),'Efeito do equipamento usado.');renderPlayerCombatPageV2(ctx);});
+root.querySelectorAll('[data-use-equipment]').forEach(btn=>btn.onclick=async()=>{
+    const i=attackEquipment.find(x=>x.id===btn.dataset.useEquipment);
+    const target=root.querySelector(`[data-equipment-target="${i.id}"]`)?.value;
+    const reinforce=Boolean(root.querySelector(`[data-equipment-reinforce="${i.id}"]`)?.checked);
+    const twoHanded=Boolean(root.querySelector(`[data-equipment-two-hands="${i.id}"]`)?.checked);
+    const choice=await chooseD20Roll({title:i.name,mode:'normal',count:1,label:'Ataque com arma',details:'Informe o d20 natural. O site escolhe os melhores bônus permitidos pela arma e soma o modificador.'});
+    const executed=await runWithRollChoice(choice,()=>withBusy(()=>executeEquipment(i,state.character.id,active.id,target,reinforce,twoHanded),'Ataque realizado.'));
+    if(executed.cancelled)return;
+    if(choice?.source==='physical')await finishPhysicalAttack(executed.value,`Dano — ${i.name}`);
+    renderPlayerCombatPageV2(ctx);
+  });
+root.querySelectorAll('[data-equipment-effect-use]').forEach(btn=>btn.onclick=async()=>{
+    const item=usableEquipment.find(x=>x.id===btn.dataset.itemId);
+    const effect=(item?.effects||[]).find(e=>String(e.id)===String(btn.dataset.effectId));if(!item||!effect)return;
+    const modeKey=btn.dataset.modeKey||null;
+    const cfg=effectVariants(effect).find(v=>(v.modeKey||null)===modeKey)?.config||effect.config||{};
+    const key=`${item.id}:${effect.id}:${modeKey||'base'}`;
+    const target=isSelfTarget(cfg)?state.character.id:root.querySelector(`[data-equipment-effect-target="${CSS.escape(key)}"]`)?.value;
+    const choice=await chooseEquipmentEffectRoll({title:`${item.name}: ${effect.name}`,cfg});
+    const executed=await runWithRollChoice(choice,()=>withBusy(()=>api.useEquipmentEffectInCombat({encounterId:active.id,actorCharacterId:state.character.id,itemId:item.id,effectId:effect.id,targetCharacterId:target,modeKey,label:`${item.name}: ${effect.name}`}),'Efeito do equipamento usado.'));
+    if(executed.cancelled)return;
+    if(choice?.source==='physical'&&executed.value?.action_id)await finishPhysicalAttack(executed.value.action_id,`Dano — ${item.name}`);
+    renderPlayerCombatPageV2(ctx);
+  });
   root.querySelectorAll('[data-extinguish-effect]').forEach(btn=>btn.onclick=async()=>{await withBusy(()=>api.extinguishCombatEffect(active.id,btn.dataset.extinguishEffect,'Apagar efeito'),'Efeito removido.');renderPlayerCombatPageV2(ctx);});
-  root.querySelectorAll('[data-detonate-bomb]').forEach(btn=>btn.onclick=async()=>{if(!confirm('Detonar a Explosão Artística agora? Use este botão no fim da rodada da mesa.'))return;await withBusy(()=>api.detonateArtBomb(active.id,state.character.id),'Explosão Artística detonada.');renderPlayerCombatPageV2(ctx);});
+root.querySelectorAll('[data-detonate-bomb]').forEach(btn=>btn.onclick=async()=>{
+    if(!confirm('Detonar a Explosão Artística agora? Use este botão no fim da rodada da mesa.'))return;
+    const bomb=effects.find(e=>e.effect_key==='art_bomb'&&String(e.source_character_id)===String(state.character.id));
+    const choice=await chooseBombRoll({title:'Explosão Artística',effect:bomb});
+    const executed=await runWithRollChoice(choice,()=>withBusy(()=>api.detonateArtBomb(active.id,state.character.id),'Explosão Artística detonada.'));
+    if(!executed.cancelled)renderPlayerCombatPageV2(ctx);
+  });
   await bindCommonCombatButtons(root,ctx,active.id,()=>renderPlayerCombatPageV2(ctx));
 }
 export async function renderMasterCombatPageV2(ctx) {
