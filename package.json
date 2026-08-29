@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test:system": "node scripts/check-system.mjs"
+    "test:system": "node scripts/check-system.mjs && node scripts/check-staff-v3.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "latest"

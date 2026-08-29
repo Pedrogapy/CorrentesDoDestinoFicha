@@ -1,0 +1,64 @@
+[1mdiff --git a/supabase/.temp/gotrue-version b/supabase/.temp/gotrue-version[m
+[1mdeleted file mode 100644[m
+[1mindex 91f6cf8..0000000[m
+[1m--- a/supabase/.temp/gotrue-version[m
+[1m+++ /dev/null[m
+[36m@@ -1 +0,0 @@[m
+[31m-v2.195.0[m
+\ No newline at end of file[m
+[1mdiff --git a/supabase/.temp/linked-project.json b/supabase/.temp/linked-project.json[m
+[1mdeleted file mode 100644[m
+[1mindex ba98d2e..0000000[m
+[1m--- a/supabase/.temp/linked-project.json[m
+[1m+++ /dev/null[m
+[36m@@ -1 +0,0 @@[m
+[31m-{"ref":"putfxvkcdkyhaonvoqmz","name":"Pedrogapy's Project","organization_id":"mevhngjjughyymrifwdr","organization_slug":"mevhngjjughyymrifwdr"}[m
+\ No newline at end of file[m
+[1mdiff --git a/supabase/.temp/pooler-url b/supabase/.temp/pooler-url[m
+[1mdeleted file mode 100644[m
+[1mindex f43c934..0000000[m
+[1m--- a/supabase/.temp/pooler-url[m
+[1m+++ /dev/null[m
+[36m@@ -1 +0,0 @@[m
+[31m-postgresql://postgres.putfxvkcdkyhaonvoqmz@aws-1-us-west-2.pooler.supabase.com:5432/postgres[m
+\ No newline at end of file[m
+[1mdiff --git a/supabase/.temp/postgres-version b/supabase/.temp/postgres-version[m
+[1mdeleted file mode 100644[m
+[1mindex 83a582e..0000000[m
+[1m--- a/supabase/.temp/postgres-version[m
+[1m+++ /dev/null[m
+[36m@@ -1 +0,0 @@[m
+[31m-17.6.1.155[m
+\ No newline at end of file[m
+[1mdiff --git a/supabase/.temp/project-ref b/supabase/.temp/project-ref[m
+[1mdeleted file mode 100644[m
+[1mindex 514b306..0000000[m
+[1m--- a/supabase/.temp/project-ref[m
+[1m+++ /dev/null[m
+[36m@@ -1 +0,0 @@[m
+[31m-putfxvkcdkyhaonvoqmz[m
+\ No newline at end of file[m
+[1mdiff --git a/supabase/.temp/rest-version b/supabase/.temp/rest-version[m
+[1mdeleted file mode 100644[m
+[1mindex bc01965..0000000[m
+[1m--- a/supabase/.temp/rest-version[m
+[1m+++ /dev/null[m
+[36m@@ -1 +0,0 @@[m
+[31m-v14.15[m
+\ No newline at end of file[m
+[1mdiff --git a/supabase/.temp/storage-migration b/supabase/.temp/storage-migration[m
+[1mdeleted file mode 100644[m
+[1mindex d5c3834..0000000[m
+[1m--- a/supabase/.temp/storage-migration[m
+[1m+++ /dev/null[m
+[36m@@ -1 +0,0 @@[m
+[31m-optimize-existing-functions-again[m
+\ No newline at end of file[m
+[1mdiff --git a/supabase/.temp/storage-version b/supabase/.temp/storage-version[m
+[1mdeleted file mode 100644[m
+[1mindex 2da6866..0000000[m
+[1m--- a/supabase/.temp/storage-version[m
+[1m+++ /dev/null[m
+[36m@@ -1 +0,0 @@[m
+[31m-v1.68.1[m
+\ No newline at end of file[m

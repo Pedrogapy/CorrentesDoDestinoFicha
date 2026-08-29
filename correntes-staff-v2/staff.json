@@ -1,0 +1,830 @@
+{
+  "package": "STAFF_V2",
+  "description": "Staff V2 de Correntes do Destino: Daiki Arashiro corrigido para nível 80 e capacidades avançadas convertidas para mecânicas funcionais do motor de combate.",
+  "npcs": [
+    {
+      "character": {
+        "first_name": "Sakura",
+        "last_name": "Gojo",
+        "nickname": "Sakura",
+        "entity_type": "npc",
+        "grade": "Grau Especial",
+        "level": 96,
+        "biography": "Professora de teoria amaldiçoada da instituição. Portadora do Ilimitado e dos Seis Olhos. Seu domínio técnico vai além da repetição das aplicações tradicionais: Sakura estuda a física por trás do espaço e converte essa compreensão em aplicações próprias do Mugen.",
+        "personality": "Observadora, confiante, sarcástica quando quer e extremamente experiente. Costuma parecer leve porque raramente precisa demonstrar esforço.",
+        "goals": "Ensinar feiticeiros a compreender o fenômeno por trás de uma técnica em vez de apenas repetir formas prontas; proteger a instituição e ampliar o entendimento da feitiçaria.",
+        "appearance": "Mulher adulta, cabelo curto claro entre branco e azul muito pálido, roupa escura elegante, postura segura e presença fria sem precisar ser hostil.",
+        "notes": "Portadora do Mugen/Ilimitado e dos Seis Olhos. É ligeiramente superior à referência de Satoru Gojo em compreensão e aplicação técnica, explorando conceitos físicos adicionais. A ficha representa aplicações de mesa; não limita o teto narrativo completo da personagem.",
+        "technique_name": "Ilimitado (Mugen) + Seis Olhos",
+        "technique_description": "Manipulação extremamente precisa do espaço por meio do Ilimitado. Os Seis Olhos fornecem percepção e eficiência excepcionais. Sakura domina Infinito, Azul, Vermelho e Roxo, além de aplicações derivadas de geometria, ótica e física espacial, como alteração de geodésicas e lentes espaciais.",
+        "attributes": {
+          "strength": 8,
+          "dexterity": 15,
+          "resistance": 14,
+          "intelligence": 17,
+          "perception": 18,
+          "will": 13,
+          "presence": 9,
+          "cursed_control": 17
+        },
+        "skills": {
+          "reflexes": 10,
+          "occultism": 10,
+          "technical_sorcery": 10,
+          "attention": 10,
+          "intuition": 9,
+          "combat_reading": 9,
+          "concentration": 9,
+          "mental_resistance": 7,
+          "spiritual_resistance": 6,
+          "channeling": 10,
+          "reinforcement": 5,
+          "technique_control": 10
+        },
+        "growth_vigor": 30,
+        "growth_reserve": 66
+      },
+      "secret_text": "Sakura possui o mesmo núcleo de poder associado ao Ilimitado e aos Seis Olhos de Satoru Gojo, mas compreende a técnica com profundidade ligeiramente maior. Ela consegue derivar aplicações de conceitos físicos espaciais que não precisam existir como 'técnicas herdadas' separadas. Não tratar isso como onipotência: o diferencial dela é compreensão, precisão, eficiência e repertório espacial.",
+      "abilities": [
+        {
+          "category": "technique",
+          "name": "Seis Olhos",
+          "description": "Percepção extraordinária de Energia Amaldiçoada, fluxo, estrutura e eficiência.",
+          "mechanics": "Ativação de postura perceptiva, sem custo. Enquanto o efeito estiver ativo, Sakura recebe +2 em seus ataques pelo refinamento de leitura e +2 CA. O efeito permanece durante o combate e pode ser ativado uma vez por combate.",
+          "config": {
+            "combat_usable": true,
+            "target_mode": "self",
+            "target_relation": "self",
+            "pa_cost": 0,
+            "ea_cost": 0,
+            "once_per_combat": true,
+            "combat_effect": {
+              "key": "sakura_six_eyes",
+              "name": "Seis Olhos",
+              "data": {
+                "conditional_attack_bonus": 2,
+                "ca_bonus": 2
+              }
+            }
+          },
+          "vp_estimated": 10,
+          "vp_approved": 10
+        },
+        {
+          "category": "technique",
+          "name": "Mugen — Infinito",
+          "description": "A distância entre Sakura e aquilo que a ameaça é dividida continuamente, impedindo o contato convencional.",
+          "mechanics": "Reação sem custo de PA, 1 EA. Ativa o Infinito espacial pelo restante do combate. Ataques que precisem alcançar Sakura através do espaço são impedidos antes da rolagem. Efeitos explicitamente marcados como capazes de ignorar o Infinito, Domínios e fenômenos que não precisam atravessar a distância podem funcionar normalmente.",
+          "config": {
+            "combat_usable": true,
+            "target_mode": "self",
+            "target_relation": "self",
+            "activation_timing": "reaction",
+            "is_reaction": true,
+            "pa_cost": 0,
+            "ea_cost": 1,
+            "once_per_combat": true,
+            "combat_effect": {
+              "key": "sakura_infinity",
+              "name": "Mugen — Infinito",
+              "data": {
+                "spatial_infinity": true
+              }
+            }
+          },
+          "vp_estimated": 10,
+          "vp_approved": 10
+        },
+        {
+          "category": "technique",
+          "name": "Azul — Convergência",
+          "description": "Sakura produz uma distorção espacial convergente que força matéria e alvos em direção a um ponto impossível.",
+          "mechanics": "Ataque de técnica. 2 PA, 8 EA. Controle Amaldiçoado + Controle de Técnica. Dano 5d10 + modificador de Controle Amaldiçoado.",
+          "config": {
+            "pa_cost": 2,
+            "ea_cost": 8,
+            "requires_attack": true,
+            "attack_attribute_key": "cursed_control",
+            "attack_skill_key": "technique_control",
+            "uses_cursed_energy": true,
+            "damage_dice_count": 5,
+            "damage_die": 10,
+            "damage_flat_attribute_key": "cursed_control",
+            "target_relation": "enemy",
+            "range": "far"
+          },
+          "vp_estimated": 8,
+          "vp_approved": 8
+        },
+        {
+          "category": "technique",
+          "name": "Vermelho — Divergência",
+          "description": "Reversão do Ilimitado aplicada como violenta divergência espacial.",
+          "mechanics": "Ataque de técnica. 2 PA, 10 EA. Dano 6d10 + modificador de Controle Amaldiçoado. Um alvo atingido pode ser tratado como Caído quando a ficção permitir.",
+          "config": {
+            "pa_cost": 2,
+            "ea_cost": 10,
+            "requires_attack": true,
+            "attack_attribute_key": "cursed_control",
+            "attack_skill_key": "technique_control",
+            "uses_cursed_energy": true,
+            "damage_dice_count": 6,
+            "damage_die": 10,
+            "damage_flat_attribute_key": "cursed_control",
+            "condition_key": "prone",
+            "target_relation": "enemy",
+            "range": "far"
+          },
+          "vp_estimated": 9,
+          "vp_approved": 9
+        },
+        {
+          "category": "technique",
+          "name": "Roxo — Massa Imaginária",
+          "description": "Combinação de convergência e divergência em uma anomalia espacial destrutiva.",
+          "mechanics": "Aplicação extrema. 3 PA, 18 EA. Dano 9d10 + modificador de Controle Amaldiçoado. Esta configuração representa uso de combate e não define o teto narrativo da técnica.",
+          "config": {
+            "pa_cost": 3,
+            "ea_cost": 18,
+            "requires_attack": true,
+            "attack_attribute_key": "cursed_control",
+            "attack_skill_key": "technique_control",
+            "uses_cursed_energy": true,
+            "damage_dice_count": 9,
+            "damage_die": 10,
+            "damage_flat_attribute_key": "cursed_control",
+            "target_relation": "enemy",
+            "range": "far",
+            "once_per_combat": true
+          },
+          "vp_estimated": 10,
+          "vp_approved": 10
+        },
+        {
+          "category": "technique",
+          "name": "Geodésica Curva",
+          "description": "Sakura altera localmente o caminho espacial mais curto entre dois pontos, curvando trajetórias sem precisar usar simplesmente atração ou repulsão.",
+          "mechanics": "Reação, 1 PA e 4 EA. Sakura curva a rota espacial de uma ameaça ou do próprio movimento. Até o fim do próximo turno relevante recebe +4 CA e +2 em ataques. Uma vez por rodada.",
+          "config": {
+            "combat_usable": true,
+            "target_mode": "self",
+            "target_relation": "self",
+            "activation_timing": "reaction",
+            "is_reaction": true,
+            "pa_cost": 1,
+            "ea_cost": 4,
+            "once_per_round": true,
+            "combat_effect": {
+              "key": "sakura_geodesic",
+              "name": "Geodésica Curva",
+              "remaining_turns": 1,
+              "data": {
+                "ca_bonus": 4,
+                "conditional_attack_bonus": 2
+              }
+            }
+          },
+          "vp_estimated": 8,
+          "vp_approved": 8
+        },
+        {
+          "category": "technique",
+          "name": "Lente Espacial",
+          "description": "Curvatura controlada do espaço para alterar trajetórias de luz e percepção de posição.",
+          "mechanics": "1 PA e 5 EA. Teste resistido de Controle Amaldiçoado + Controle de Técnica contra Percepção + Atenção. Em sucesso, a curvatura ótica e espacial impõe -4 nos ataques do alvo e -2 CA por 2 turnos.",
+          "config": {
+            "combat_usable": true,
+            "pa_cost": 1,
+            "ea_cost": 5,
+            "target_relation": "enemy",
+            "range": "far",
+            "contest": {
+              "attacker_attribute": "cursed_control",
+              "attacker_skill": "technique_control",
+              "defender_attribute": "perception",
+              "defender_skill": "attention"
+            },
+            "combat_effect": {
+              "key": "sakura_spatial_lens",
+              "name": "Lente Espacial",
+              "remaining_turns": 2,
+              "data": {
+                "conditional_attack_bonus": -4,
+                "ca_bonus": -2
+              }
+            }
+          },
+          "vp_estimated": 7,
+          "vp_approved": 7
+        },
+        {
+          "category": "domain",
+          "name": "Vazio Imensurável",
+          "description": "Expansão de Domínio ligada ao Ilimitado.",
+          "mechanics": "3 PA e 20 EA por alvo exposto. Teste resistido de Controle Amaldiçoado + Controle de Técnica contra Vontade + Resistência Espiritual. Em sucesso, o alvo fica incapaz de agir, reagir ou se mover por 2 turnos, além de sofrer -6 em ataques e CA. A ficha aplica o efeito por alvo; o Mestre seleciona individualmente quem foi realmente capturado pela Expansão.",
+          "config": {
+            "combat_usable": true,
+            "pa_cost": 3,
+            "ea_cost": 20,
+            "target_relation": "enemy",
+            "range": "far",
+            "once_per_combat_per_target": true,
+            "contest": {
+              "attacker_attribute": "cursed_control",
+              "attacker_skill": "technique_control",
+              "defender_attribute": "will",
+              "defender_skill": "spiritual_resistance"
+            },
+            "combat_effect": {
+              "key": "sakura_unlimited_void",
+              "name": "Vazio Imensurável",
+              "remaining_turns": 2,
+              "data": {
+                "blocks_actions": true,
+                "blocks_reactions": true,
+                "blocks_movement": true,
+                "conditional_attack_bonus": -6,
+                "ca_bonus": -6
+              }
+            }
+          },
+          "vp_estimated": 10,
+          "vp_approved": 10
+        }
+      ],
+      "equipment": []
+    },
+    {
+      "character": {
+        "first_name": "Sayuri",
+        "last_name": "Aozora",
+        "nickname": "Sayuri",
+        "entity_type": "npc",
+        "grade": "Grau 1",
+        "level": 54,
+        "biography": "Professora de combate da instituição. É conhecida por conduzir treinos de forma aparentemente relaxada e mudar de postura instantaneamente quando a situação exige seriedade.",
+        "personality": "Relaxada, bem-humorada e difícil de apressar fora de perigo. Em combate se torna objetiva, afiada e extremamente presente, sem perder a naturalidade.",
+        "goals": "Transformar técnica em instinto prático e ensinar alunos a sobreviver quando o combate deixa de seguir o plano.",
+        "appearance": "Mulher adulta de cabelo azul-ciano volumoso, visual enérgico e marcante, normalmente usando roupa preta com calça verde ou oliva.",
+        "notes": "Técnica criada para combinar com sua função de professora de combate e personalidade: controle de gradientes de pressão do ar, alternando entre fluidez relaxada e explosões súbitas de força.",
+        "technique_name": "Frentes de Pressão",
+        "technique_description": "Sayuri manipula gradientes locais de pressão no ar. Ela comprime e rarefaz volumes próximos para impulsionar o próprio corpo, amplificar impactos, criar rupturas barométricas e controlar o espaço de combate. Quanto mais precisa a diferença de pressão, mais eficiente o efeito.",
+        "attributes": {
+          "strength": 11,
+          "dexterity": 13,
+          "resistance": 10,
+          "intelligence": 6,
+          "perception": 9,
+          "will": 7,
+          "presence": 4,
+          "cursed_control": 9
+        },
+        "skills": {
+          "fight": 7,
+          "impact": 7,
+          "acrobatics": 6,
+          "reflexes": 7,
+          "combat_reading": 7,
+          "channeling": 6,
+          "reinforcement": 6,
+          "technique_control": 7,
+          "athletics": 5,
+          "defend": 5
+        },
+        "growth_vigor": 30,
+        "growth_reserve": 24
+      },
+      "secret_text": "Sayuri não precisa parecer ameaçadora para ser perigosa. O contraste é parte central dela: baixa pressão social, alta pressão no instante em que age. Sua técnica foi pensada para treinos, mobilidade e combate real.",
+      "abilities": [
+        {
+          "category": "technique",
+          "name": "Passo de Baixa Pressão",
+          "description": "Sayuri rarefaz o ar numa direção e comprime atrás de si, convertendo a diferença em aceleração.",
+          "mechanics": "1 PA e 2 EA. Sayuri usa um gradiente de pressão para se reposicionar e tornar sua trajetória difícil de acompanhar. Recebe +3 CA e +1 em ataques por 1 turno. Uma vez por rodada.",
+          "config": {
+            "combat_usable": true,
+            "target_mode": "self",
+            "target_relation": "self",
+            "pa_cost": 1,
+            "ea_cost": 2,
+            "once_per_round": true,
+            "combat_effect": {
+              "key": "sayuri_low_pressure_step",
+              "name": "Passo de Baixa Pressão",
+              "remaining_turns": 1,
+              "data": {
+                "ca_bonus": 3,
+                "conditional_attack_bonus": 1
+              }
+            }
+          },
+          "vp_estimated": 5,
+          "vp_approved": 5
+        },
+        {
+          "category": "technique",
+          "name": "Punho de Frente Fria",
+          "description": "Um golpe físico recebe uma camada comprimida de ar que colapsa junto do impacto.",
+          "mechanics": "1 PA, 3 EA. Força + Lutar. Dano 3d8 + modificador de Força.",
+          "config": {
+            "pa_cost": 1,
+            "ea_cost": 3,
+            "requires_attack": true,
+            "attack_attribute_key": "strength",
+            "attack_skill_key": "fight",
+            "uses_cursed_energy": true,
+            "damage_dice_count": 3,
+            "damage_die": 8,
+            "damage_flat_attribute_key": "strength",
+            "target_relation": "enemy",
+            "range": "near"
+          },
+          "vp_estimated": 5,
+          "vp_approved": 5
+        },
+        {
+          "category": "technique",
+          "name": "Ruptura Barométrica",
+          "description": "Sayuri comprime uma frente de ar e a libera como uma pancada súbita de pressão.",
+          "mechanics": "1 PA, 5 EA. Controle Amaldiçoado + Controle de Técnica. Dano 4d8 + modificador de Controle Amaldiçoado; pode derrubar.",
+          "config": {
+            "pa_cost": 1,
+            "ea_cost": 5,
+            "requires_attack": true,
+            "attack_attribute_key": "cursed_control",
+            "attack_skill_key": "technique_control",
+            "uses_cursed_energy": true,
+            "damage_dice_count": 4,
+            "damage_die": 8,
+            "damage_flat_attribute_key": "cursed_control",
+            "condition_key": "prone",
+            "target_relation": "enemy",
+            "range": "far"
+          },
+          "vp_estimated": 6,
+          "vp_approved": 6
+        },
+        {
+          "category": "technique",
+          "name": "Martelo Atmosférico",
+          "description": "Uma coluna curta de alta pressão despenca sobre o alvo no instante de abertura.",
+          "mechanics": "2 PA, 7 EA. Ataque de técnica, 5d8 + Controle Amaldiçoado. Uso forte de alvo único.",
+          "config": {
+            "pa_cost": 2,
+            "ea_cost": 7,
+            "requires_attack": true,
+            "attack_attribute_key": "cursed_control",
+            "attack_skill_key": "technique_control",
+            "uses_cursed_energy": true,
+            "damage_dice_count": 5,
+            "damage_die": 8,
+            "damage_flat_attribute_key": "cursed_control",
+            "target_relation": "enemy",
+            "range": "far"
+          },
+          "vp_estimated": 7,
+          "vp_approved": 7
+        },
+        {
+          "category": "technique",
+          "name": "Olho da Tempestade",
+          "description": "Sayuri mantém uma região de pressão estável ao redor do próprio corpo para ler deslocamentos e responder sem movimentos desperdiçados.",
+          "mechanics": "1 PA e 3 EA. Sayuri estabiliza a pressão imediatamente ao redor do corpo e passa a ler mudanças de ar, postura e deslocamento. Recebe +2 em ataques e +2 CA por 3 turnos. Uma vez por combate.",
+          "config": {
+            "combat_usable": true,
+            "target_mode": "self",
+            "target_relation": "self",
+            "pa_cost": 1,
+            "ea_cost": 3,
+            "once_per_combat": true,
+            "combat_effect": {
+              "key": "sayuri_eye_of_storm",
+              "name": "Olho da Tempestade",
+              "remaining_turns": 3,
+              "data": {
+                "conditional_attack_bonus": 2,
+                "ca_bonus": 2
+              }
+            }
+          },
+          "vp_estimated": 5,
+          "vp_approved": 5
+        }
+      ],
+      "equipment": []
+    },
+    {
+      "character": {
+        "first_name": "Akiya",
+        "last_name": "",
+        "nickname": "Akiya",
+        "entity_type": "npc",
+        "grade": "Grau 1",
+        "level": 62,
+        "biography": "Professora, ferreira e armeira da instituição. Trabalha com ferramentas amaldiçoadas, manutenção e criação de equipamentos, mas é também uma combatente física extremamente poderosa.",
+        "personality": "Prática, firme, determinada, desconfiada da hierarquia e protetora com quem conquista seu respeito. Prefere algo que funcione a algo que apenas pareça sofisticado.",
+        "goals": "Construir ferramentas que mantenham feiticeiros vivos, formar alunos capazes de usar o próprio corpo e equipamento com responsabilidade e impedir que burocracia ruim mate gente competente.",
+        "appearance": "Ferreira e lutadora de presença forte. Aparência funcional de oficina e combate, com marcas naturais de trabalho pesado e postura de quem está acostumada a lidar com metal, armas e calor.",
+        "notes": "Mantém fluxo constante de Energia Amaldiçoada pelo corpo para reforço físico e proteção. É forte por treinamento, ofício e reforço, não apenas por sua técnica. A transformação acessório↔armadura é feita por Código de Forja; Aventurine alcança resultado semelhante por sigilos, símbolos, materiais e método ritualístico.",
+        "technique_name": "Código de Forja",
+        "technique_description": "Akiya grava instruções amaldiçoadas em metal e em objetos que possuam metal, atribuindo funções, estados e respostas condicionais. Pode programar uma peça para desdobrar, travar, ancorar, mudar forma ou executar uma função quando recebe Energia Amaldiçoada. Quanto mais complexo o programa, maior o preparo e o controle necessários.",
+        "attributes": {
+          "strength": 15,
+          "dexterity": 10,
+          "resistance": 15,
+          "intelligence": 10,
+          "perception": 7,
+          "will": 7,
+          "presence": 3,
+          "cursed_control": 10
+        },
+        "skills": {
+          "athletics": 8,
+          "fight": 8,
+          "impact": 8,
+          "defend": 8,
+          "fortitude": 8,
+          "technical_sorcery": 7,
+          "channeling": 7,
+          "reinforcement": 8,
+          "technique_control": 7,
+          "steadiness": 2
+        },
+        "growth_vigor": 42,
+        "growth_reserve": 20
+      },
+      "secret_text": "Akiya e Aventurine conseguem produzir equipamentos compactados em acessórios, mas por processos diferentes. Aventurine desenvolveu a ideia originalmente por via ritualística: sigilos, símbolos e combinação de materiais. Akiya adaptou/“roubou” a ideia usando Código de Forja, programando diretamente o metal. Isso é uma piada/competição recorrente entre os dois, não prova de hostilidade.",
+      "abilities": [
+        {
+          "category": "general",
+          "name": "Fluxo Constante de Reforço",
+          "description": "Akiya mantém Energia Amaldiçoada circulando pelo corpo quase sem interrupção.",
+          "mechanics": "Ativação sem custo, uma vez por combate. Representa Akiya elevando ao nível de combate o fluxo que normalmente já mantém no corpo. Enquanto ativo recebe +2 em ataques físicos e +2 CA.",
+          "config": {
+            "combat_usable": true,
+            "target_mode": "self",
+            "target_relation": "self",
+            "pa_cost": 0,
+            "ea_cost": 0,
+            "once_per_combat": true,
+            "combat_effect": {
+              "key": "akiya_constant_reinforcement",
+              "name": "Fluxo Constante de Reforço",
+              "data": {
+                "physical_attack_bonus": 2,
+                "ca_bonus": 2
+              }
+            }
+          },
+          "vp_estimated": 6,
+          "vp_approved": 6
+        },
+        {
+          "category": "technique",
+          "name": "Martelo de Forja",
+          "description": "Akiya combina força física, reforço e um comando curto aplicado à massa metálica da arma.",
+          "mechanics": "1 PA, 2 EA. Força + Lutar. Dano 4d8 + modificador de Força.",
+          "config": {
+            "pa_cost": 1,
+            "ea_cost": 2,
+            "requires_attack": true,
+            "attack_attribute_key": "strength",
+            "attack_skill_key": "fight",
+            "uses_cursed_energy": true,
+            "damage_dice_count": 4,
+            "damage_die": 8,
+            "damage_flat_attribute_key": "strength",
+            "target_relation": "enemy",
+            "range": "near"
+          },
+          "vp_estimated": 6,
+          "vp_approved": 6
+        },
+        {
+          "category": "technique",
+          "name": "Comando: Âncora",
+          "description": "Akiya programa metal em contato com o alvo ou com sua posição para buscar um estado de fixação.",
+          "mechanics": "1 PA, 4 EA. Ataque de técnica. 2d8 + Controle Amaldiçoado; em acerto aplica Imobilizado quando a ficção comportar a ancoragem.",
+          "config": {
+            "pa_cost": 1,
+            "ea_cost": 4,
+            "requires_attack": true,
+            "attack_attribute_key": "cursed_control",
+            "attack_skill_key": "technique_control",
+            "uses_cursed_energy": true,
+            "damage_dice_count": 2,
+            "damage_die": 8,
+            "damage_flat_attribute_key": "cursed_control",
+            "condition_key": "immobilized",
+            "target_relation": "enemy",
+            "range": "near"
+          },
+          "vp_estimated": 7,
+          "vp_approved": 7
+        },
+        {
+          "category": "technique",
+          "name": "Comando: Ruptura",
+          "description": "Ela reprograma temporariamente tensões e articulações de uma peça metálica para fazê-la abrir, partir ou perder função.",
+          "mechanics": "1 PA e 4 EA. Quando há metal relevante no equipamento/estrutura do alvo, Akiya disputa Controle Amaldiçoado + Controle de Técnica contra Resistência + Firmeza. Em sucesso, a programação de tensões reduz a CA do alvo em 3 e seus ataques em 2 por 2 turnos.",
+          "config": {
+            "combat_usable": true,
+            "pa_cost": 1,
+            "ea_cost": 4,
+            "target_relation": "enemy",
+            "range": "near",
+            "contest": {
+              "attacker_attribute": "cursed_control",
+              "attacker_skill": "technique_control",
+              "defender_attribute": "resistance",
+              "defender_skill": "steadiness"
+            },
+            "combat_effect": {
+              "key": "akiya_rupture_command",
+              "name": "Comando: Ruptura",
+              "remaining_turns": 2,
+              "data": {
+                "ca_bonus": -3,
+                "conditional_attack_bonus": -2
+              }
+            }
+          },
+          "vp_estimated": 7,
+          "vp_approved": 7
+        },
+        {
+          "category": "technique",
+          "name": "Comando: Desdobrar",
+          "description": "Um objeto metálico programado abandona a forma compacta e assume sua configuração funcional.",
+          "mechanics": "1 PA e 2 EA, uma vez por combate. Akiya envia o gatilho ao metal programado e sua armadura compactada se desdobra. Enquanto o efeito estiver ativo recebe +3 CA e reduz cada dano recebido em 1d6+2.",
+          "config": {
+            "combat_usable": true,
+            "target_mode": "self",
+            "target_relation": "self",
+            "pa_cost": 1,
+            "ea_cost": 2,
+            "once_per_combat": true,
+            "combat_effect": {
+              "key": "akiya_deployed_armor",
+              "name": "Armadura Desdobrada",
+              "data": {
+                "ca_bonus": 3,
+                "damage_reduction_dice_count": 1,
+                "damage_reduction_die": 6,
+                "damage_reduction_flat": 2,
+                "applies_to": "any"
+              }
+            }
+          },
+          "vp_estimated": 7,
+          "vp_approved": 7
+        }
+      ],
+      "equipment": [
+        {
+          "name": "Brinco-Armadura de Oficina",
+          "equipment_type": "Armadura",
+          "grade": "Grau 1",
+          "description": "Uma armadura de Akiya programada para permanecer comprimida na forma de um brinco até receber Energia Amaldiçoada.",
+          "mechanics": "Exemplo funcional do Código de Forja. Ao receber EA, a estrutura metálica executa o programa de desdobramento e assume a forma de armadura real. A transformação não é o mesmo método de Aventurine: Akiya programa o metal pela própria técnica.",
+          "active": true
+        }
+      ]
+    },
+    {
+      "character": {
+        "first_name": "Daiki",
+        "last_name": "Arashiro",
+        "nickname": "Diretor",
+        "entity_type": "npc",
+        "grade": "Grau Especial",
+        "level": 80,
+        "biography": "Diretor da instituição e feiticeiro mais forte conhecido pela administração atual. Sua função vai muito além de comandar a escola: ele administra responsabilidades, artefatos e segredos herdados de diretores anteriores.",
+        "personality": "Estratégico, controlador, refinado e difícil de desestabilizar. Sua autoridade não é teatral: Daiki está acostumado a decidir quando ninguém mais possui informação suficiente para fazê-lo.",
+        "goals": "Manter a instituição funcional, impedir que ameaças de escala catastrófica alcancem pessoas despreparadas e preservar conhecimentos e responsabilidades que não podem circular livremente.",
+        "appearance": "Homem adulto de cabelo loiro curto penteado para trás, roupas formais escuras, aparência refinada e limpa. Passa a impressão de que está no controle mesmo quando não explica por quê.",
+        "notes": "Daiki é nível 80. O Mandato Real é seu poder pessoal e é separado das Chaves da Realidade. Como diretor, ele possui acesso institucional a artefatos e responsabilidades que ampliam o que consegue fazer fora da própria Técnica. A ficha separa explicitamente Técnica e acervo.",
+        "technique_name": "Mandato Real",
+        "technique_description": "A técnica de Daiki transforma autoridade em imposição sobre a realidade. Ele profere ordens e força o mundo ao alcance de sua vontade a buscar um estado compatível: corpos podem se curvar, movimentos podem cessar, matéria pode romper e fenômenos podem ser recusados. A potência depende da escala, precisão e resistência daquilo que ele tenta ordenar.",
+        "attributes": {
+          "strength": 8,
+          "dexterity": 9,
+          "resistance": 12,
+          "intelligence": 12,
+          "perception": 11,
+          "will": 14,
+          "presence": 18,
+          "cursed_control": 11
+        },
+        "skills": {
+          "reflexes": 5,
+          "defend": 5,
+          "fortitude": 5,
+          "occultism": 6,
+          "attention": 4,
+          "intuition": 5,
+          "combat_reading": 6,
+          "concentration": 7,
+          "spiritual_resistance": 7,
+          "mental_resistance": 6,
+          "intimidation": 9,
+          "leadership": 8,
+          "channeling": 4,
+          "reinforcement": 4,
+          "technique_control": 8
+        },
+        "growth_vigor": 36,
+        "growth_reserve": 44
+      },
+      "secret_text": "As Chaves da Realidade são separadas da Técnica Amaldiçoada de Daiki. Ele as guarda por ser diretor, por carregar responsabilidades institucionais e por ser o feiticeiro mais forte conhecido. Parte delas pode se relacionar ao conflito principal. A Biblioteca do Diretor funciona quase como uma dimensão de bolso e conserva registros deixados por antigos diretores, além de descobertas e catálogos de Daiki. O artefato de madeira cadastrado no inventário cria o único acesso: a porta criada não pode ser destruída nem aberta por terceiros, sem exceções.",
+      "abilities": [
+        {
+          "category": "technique",
+          "name": "Presença do Rei",
+          "description": "A simples manifestação deliberada da autoridade de Daiki pressiona corpo e instinto de quem está diante dele.",
+          "mechanics": "0 PA e 3 EA. Teste resistido de Presença + Intimidação contra Vontade + Resistência Mental. Em sucesso, a pressão régia impõe -2 nos ataques e -2 CA do alvo por 2 turnos. Uma vez por combate por alvo.",
+          "config": {
+            "combat_usable": true,
+            "pa_cost": 0,
+            "ea_cost": 3,
+            "target_relation": "enemy",
+            "range": "far",
+            "once_per_combat_per_target": true,
+            "contest": {
+              "attacker_attribute": "presence",
+              "attacker_skill": "intimidation",
+              "defender_attribute": "will",
+              "defender_skill": "mental_resistance"
+            },
+            "combat_effect": {
+              "key": "daiki_royal_presence",
+              "name": "Presença do Rei",
+              "remaining_turns": 2,
+              "data": {
+                "conditional_attack_bonus": -2,
+                "ca_bonus": -2
+              }
+            }
+          },
+          "vp_estimated": 8,
+          "vp_approved": 8
+        },
+        {
+          "category": "technique",
+          "name": "Mandato: Ajoelhe-se",
+          "description": "Daiki ordena que o alvo abandone a postura e se curve.",
+          "mechanics": "1 PA e 5 EA. Presença + Intimidação contra Vontade + Resistência Espiritual. Em sucesso, o alvo é forçado a uma postura de submissão: não pode se mover nem reagir, recebe -4 em ataques e -4 CA por 1 turno. Ainda pode executar uma ação se ela for possível na posição em que se encontra.",
+          "config": {
+            "combat_usable": true,
+            "pa_cost": 1,
+            "ea_cost": 5,
+            "target_relation": "enemy",
+            "range": "far",
+            "contest": {
+              "attacker_attribute": "presence",
+              "attacker_skill": "intimidation",
+              "defender_attribute": "will",
+              "defender_skill": "spiritual_resistance"
+            },
+            "combat_effect": {
+              "key": "daiki_command_kneel",
+              "name": "Mandato: Ajoelhe-se",
+              "remaining_turns": 1,
+              "data": {
+                "blocks_reactions": true,
+                "blocks_movement": true,
+                "conditional_attack_bonus": -4,
+                "ca_bonus": -4
+              }
+            }
+          },
+          "vp_estimated": 9,
+          "vp_approved": 9
+        },
+        {
+          "category": "technique",
+          "name": "Mandato: Quebre",
+          "description": "Uma ordem curta força uma ruptura localizada naquilo que Daiki designa.",
+          "mechanics": "2 PA e 8 EA. Ataque de Mandato usando Presença + Controle de Técnica. A ordem produz a ruptura diretamente no estado do alvo: 6d10 + modificador de Presença. Por não ser um projétil nem precisar percorrer a distância convencional, é marcado como capaz de atravessar defesas puramente espaciais como o Infinito.",
+          "config": {
+            "combat_usable": true,
+            "pa_cost": 2,
+            "ea_cost": 8,
+            "requires_attack": true,
+            "attack_attribute_key": "presence",
+            "attack_skill_key": "technique_control",
+            "uses_cursed_energy": true,
+            "damage_dice_count": 6,
+            "damage_die": 10,
+            "damage_flat_attribute_key": "presence",
+            "target_relation": "enemy",
+            "range": "far",
+            "bypass_spatial_infinity": true
+          },
+          "vp_estimated": 9,
+          "vp_approved": 9
+        },
+        {
+          "category": "technique",
+          "name": "Mandato: Cale-se",
+          "description": "Daiki impõe silêncio à capacidade de produzir uma voz funcional.",
+          "mechanics": "1 PA e 6 EA. Presença + Liderança contra Vontade + Resistência Mental. Em sucesso, o alvo tem sua expressão amaldiçoada silenciada por 2 turnos: Técnicas, Manifestações, Transformações e Domínios ficam bloqueados. Habilidades Gerais e ataques básicos continuam possíveis.",
+          "config": {
+            "combat_usable": true,
+            "pa_cost": 1,
+            "ea_cost": 6,
+            "target_relation": "enemy",
+            "range": "far",
+            "contest": {
+              "attacker_attribute": "presence",
+              "attacker_skill": "leadership",
+              "defender_attribute": "will",
+              "defender_skill": "mental_resistance"
+            },
+            "combat_effect": {
+              "key": "daiki_command_silence",
+              "name": "Mandato: Cale-se",
+              "remaining_turns": 2,
+              "data": {
+                "blocks_cursed_abilities": true,
+                "silenced": true
+              }
+            }
+          },
+          "vp_estimated": 8,
+          "vp_approved": 8
+        },
+        {
+          "category": "technique",
+          "name": "Mandato: Pare",
+          "description": "Ele ordena que um movimento ou processo cesse.",
+          "mechanics": "1 PA e 8 EA. Presença + Controle de Técnica contra Vontade + Resistência Espiritual. Em sucesso, a realidade força o alvo a parar por 1 turno: ações, reações e movimento ficam bloqueados pelo próprio motor de combate.",
+          "config": {
+            "combat_usable": true,
+            "pa_cost": 1,
+            "ea_cost": 8,
+            "target_relation": "enemy",
+            "range": "far",
+            "once_per_combat_per_target": true,
+            "contest": {
+              "attacker_attribute": "presence",
+              "attacker_skill": "technique_control",
+              "defender_attribute": "will",
+              "defender_skill": "spiritual_resistance"
+            },
+            "combat_effect": {
+              "key": "daiki_command_stop",
+              "name": "Mandato: Pare",
+              "remaining_turns": 1,
+              "data": {
+                "blocks_actions": true,
+                "blocks_reactions": true,
+                "blocks_movement": true
+              }
+            }
+          },
+          "vp_estimated": 9,
+          "vp_approved": 9
+        },
+        {
+          "category": "technique",
+          "name": "Mandato: Eu Recuso",
+          "description": "Daiki rejeita a permanência de um fenômeno imediato dentro da sua autoridade.",
+          "mechanics": "Reação, 1 PA e 10 EA, uma vez por combate. Daiki nega uma alteração dirigida contra si. Se já houver um ataque aguardando resolução, o próximo é cancelado sem dano. Enquanto o efeito permanece até o fim do turno, novas alterações externas também não conseguem se estabelecer sobre ele.",
+          "config": {
+            "combat_usable": true,
+            "target_mode": "self",
+            "target_relation": "self",
+            "activation_timing": "reaction",
+            "is_reaction": true,
+            "pa_cost": 1,
+            "ea_cost": 10,
+            "once_per_combat": true,
+            "combat_effect": {
+              "key": "daiki_royal_refusal",
+              "name": "Mandato: Eu Recuso",
+              "remaining_turns": 1,
+              "uses": 1,
+              "data": {
+                "royal_refusal": true,
+                "immune_to_external_changes": true
+              }
+            }
+          },
+          "vp_estimated": 10,
+          "vp_approved": 10
+        }
+      ],
+      "equipment": [
+        {
+          "name": "Chave da Biblioteca do Diretor",
+          "equipment_type": "Artefato",
+          "grade": "Grau Especial",
+          "description": "Um bloco de madeira de aparência antiga com um encaixe deliberadamente vazio. A peça que parece faltar não existe; a ausência faz parte do artefato.",
+          "mechanics": "Daiki pode encostar o artefato numa parede e criar uma porta para a Biblioteca do Diretor. Apenas Daiki, portando a chave, pode abrir essa porta. A porta não pode ser destruída, forçada ou aberta por terceiros, sem exceções. O destino é um espaço semelhante a uma dimensão de bolso que guarda o acervo dos diretores.",
+          "active": true
+        }
+      ]
+    }
+  ]
+}
