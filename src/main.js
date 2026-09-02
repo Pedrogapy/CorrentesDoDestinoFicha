@@ -707,6 +707,7 @@ async function renderMasterPage() {
   root.querySelectorAll('[data-approve-ability]').forEach(btn=>btn.onclick=async()=>{const id=btn.dataset.approveAbility;const vp=Number(root.querySelector(`[data-vp-approved="${id}"]`)?.value||1);const response=root.querySelector(`[data-ability-response="${id}"]`)?.value||'';const ability=pendingAbilities.find(a=>a.id===id);const {error}=await supabase.from('abilities').update({status:'approved',vp_approved:vp,master_response:response,limit_override:ability?.category==='domain'}).eq('id',id);if(error)return toast(error.message,'bad');toast('Habilidade aprovada.','good');renderMasterPage();});
   root.querySelectorAll('[data-reject-ability]').forEach(btn=>btn.onclick=async()=>{const id=btn.dataset.rejectAbility;const response=root.querySelector(`[data-ability-response="${id}"]`)?.value||prompt('Resposta:')||'';const {error}=await supabase.from('abilities').update({status:'rejected',master_response:response}).eq('id',id);if(error)return toast(error.message,'bad');toast('Habilidade rejeitada.','good');renderMasterPage();});
   bindPendingEquipmentQueue(root,pendingEquipment,combatContext(root),renderMasterPage);
+  root.querySelector('#condition-form').insertAdjacentHTML('afterbegin','<div class="notice">O catálogo público usa estados genéricos estáveis. Novas condições cadastradas aqui ficam restritas ao Mestre. Para um efeito específico em jogo, use Efeito Improvisado no combate.</div>');
   root.querySelector('#condition-form').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);await withBusy(()=>api.upsertSystemCondition({key:String(f.get('key')).trim(),name:String(f.get('name')).trim(),description:String(f.get('description')).trim(),active:true}),'Condição salva.');state.conditions=await api.getSystemConditions();renderMasterPage();};
   root.querySelectorAll('[data-condition-disable]').forEach(btn=>btn.onclick=async()=>{await withBusy(()=>api.deactivateSystemCondition(btn.dataset.conditionDisable),'Condição desativada.');state.conditions=await api.getSystemConditions();renderMasterPage();});
   root.querySelectorAll('[data-request-answer]').forEach(btn=>btn.onclick=async()=>{const id=btn.dataset.requestAnswer;const response=root.querySelector(`[data-request-response="${id}"]`)?.value||'';await withBusy(()=>api.resolveMasterRequest(id,'answered',response),'Solicitação respondida.');renderMasterPage();});
@@ -868,7 +869,8 @@ function subscribeCombatRealtime(encounterId, rerender) {
   };
   state.realtimeChannel = supabase
     .channel(`combat-${encounterId}-${state.profile.role}`)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'combat_participants', filter: `encounter_id=eq.${encounterId}` }, refresh)
+    // Participantes, ações e efeitos sinalizam mudanças pelo encontro. O player
+    // refaz as projeções seguras sem receber arrays privados pela assinatura.
     .on('postgres_changes', { event: '*', schema: 'public', table: 'roll_logs', filter: `encounter_id=eq.${encounterId}` }, refresh)
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'combat_encounters', filter: `id=eq.${encounterId}` }, refresh)
     .subscribe();

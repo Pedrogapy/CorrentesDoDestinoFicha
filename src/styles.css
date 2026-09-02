@@ -635,3 +635,4 @@ select[multiple]{
   .combat-board-grid { --combat-board-cell:44px; }
   .combat-board-token { min-width:28px; min-height:28px; }
 }
+.grid[hidden], [data-improv-kinds][hidden] { display: none !important; }

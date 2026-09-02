@@ -128,10 +128,7 @@ export async function createAbility(payload) {
 
 export async function getCursedBodyTechnique(characterId) {
   const { data, error } = await supabase
-    .from('character_cursed_body_techniques')
-    .select('*')
-    .eq('character_id', characterId)
-    .maybeSingle();
+    .rpc('get_visible_cursed_body', { p_character_id: characterId });
   if (error) throw error;
   return data || null;
 }
@@ -140,10 +137,10 @@ export async function createCursedBodyTechnique(payload) {
   const { data, error } = await supabase
     .from('character_cursed_body_techniques')
     .insert(payload)
-    .select('*')
+    .select('id,character_id')
     .single();
   if (error) throw error;
-  return data;
+  return getCursedBodyTechnique(data.character_id);
 }
 
 export async function updateCursedBodyTechnique(id, patch) {
@@ -151,10 +148,10 @@ export async function updateCursedBodyTechnique(id, patch) {
     .from('character_cursed_body_techniques')
     .update({ ...patch, updated_at: new Date().toISOString() })
     .eq('id', id)
-    .select('*')
+    .select('id,character_id')
     .single();
   if (error) throw error;
-  return data;
+  return getCursedBodyTechnique(data.character_id);
 }
 
 export async function deleteCursedBodyTechnique(id) {
@@ -316,9 +313,7 @@ export async function spendEquipmentCharges(id, amount=1) {
 }
 
 export async function getAuditLogs(characterId = null) {
-  let query = supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(100);
-  if (characterId) query = query.eq('character_id', characterId);
-  const { data, error } = await query;
+  const { data, error } = await supabase.rpc('get_visible_audit_logs', { p_character_id: characterId });
   if (error) throw error;
   return data || [];
 }
@@ -529,9 +524,10 @@ export async function addCombatParticipants(encounterId, participants=[]) {
   }));
   if(!rows.length) return [];
   return withCombatUndo(encounterId, rows.length===1?'Adicionar participante':`Adicionar ${rows.length} participantes`, async()=>{
-    const { data, error } = await supabase.from('combat_participants').insert(rows).select('*');
+    const { data, error } = await supabase.from('combat_participants').insert(rows).select('id');
     if (error) throw error;
-    return data || [];
+    const ids = new Set((data || []).map(p => p.id));
+    return (await getCombatParticipants(encounterId)).filter(p => ids.has(p.id));
   });
 }
 
@@ -547,19 +543,16 @@ export async function addCombatParticipant(encounterId, character, options={}) {
 
 export async function getCombatParticipants(encounterId) {
   const { data, error } = await supabase
-    .from('combat_participants')
-    .select('*, characters:characters!combat_participants_character_id_fkey(*)')
-    .eq('encounter_id', encounterId)
-    .order('initiative', { ascending: false });
+    .rpc('get_combat_participants', { p_encounter_id: encounterId });
   if (error) throw error;
   return data || [];
 }
 
 export async function updateCombatParticipant(id, changes, encounterId=null) {
   return withCombatUndo(encounterId, 'Ajustar recursos de combate', async()=>{
-    const { data, error } = await supabase.from('combat_participants').update(changes).eq('id', id).select('*').single();
+    const { data, error } = await supabase.from('combat_participants').update(changes).eq('id', id).select('id,encounter_id').single();
     if (error) throw error;
-    return data;
+    return (await getCombatParticipants(data.encounter_id)).find(p => p.id === id);
   });
 }
 
@@ -749,11 +742,26 @@ export async function useCombatEffect(payload) {
 // ============================================================
 
 export async function getCombatEffects(encounterId) {
-  const { data, error } = await supabase
-    .from('combat_effect_states')
-    .select('*')
-    .eq('encounter_id', encounterId)
-    .order('created_at', { ascending: true });
+  const { data, error } = await supabase.rpc('get_visible_combat_effects', { p_encounter_id: encounterId });
+  if (error) throw error;
+  return data || [];
+}
+
+// Estas operações incluem o snapshot e sua confirmação na mesma transação no banco.
+export async function improviseCombatAction(encounterId, action) {
+  const { data, error } = await supabase.rpc('improvise_combat_action', { p_encounter_id: encounterId, p_action: action });
+  if (error) throw error;
+  return data;
+}
+
+export async function manageImprovisedEffect(effectId, consume = false) {
+  const { error } = await supabase.rpc('manage_improvised_effect', { p_effect_id: effectId, p_consume: consume });
+  if (error) throw error;
+}
+
+export async function getImprovisedEvents(encounterId) {
+  const { data, error } = await supabase.from('roll_logs').select('id,label,created_at')
+    .eq('encounter_id', encounterId).eq('roll_type', 'improvised').order('created_at', { ascending: false }).limit(100);
   if (error) throw error;
   return data || [];
 }

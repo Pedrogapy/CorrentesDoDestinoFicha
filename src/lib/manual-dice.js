@@ -256,6 +256,10 @@ export async function chooseResourceRechargeRoll({title,recharge}) {
 }
 
 export async function chooseBombRoll({title,effect}) {
+  if (effect?.bomb_roll) {
+    const { count, sides, target_count: targets } = effect.bomb_roll;
+    return chooseDiceRoll({title,groups:Array.from({length:targets},(_,i)=>({label:`Explosão — alvo ${i+1}`,count,sides})),details:'Uma rolagem por alvo.'});
+  }
   const data=effect?.data||{};
   const ids=Array.isArray(data.target_ids)?data.target_ids:[];
   const count=Number(data.damage_dice_count||0),sides=Number(data.damage_die||0);

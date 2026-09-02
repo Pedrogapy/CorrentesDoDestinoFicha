@@ -7,12 +7,16 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "test": "node scripts/check-all.mjs",
+    "test:combat": "node scripts/check-improvised-combat.mjs && node scripts/check-improvised-ui.mjs",
     "test:system": "node scripts/check-system.mjs && node scripts/check-staff-v3.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "latest"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "happy-dom": "^20.13.1",
     "vite": "latest"
   }
 }
