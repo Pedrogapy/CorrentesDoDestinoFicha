@@ -912,3 +912,61 @@ export async function useDigitalAttackDamage(actionId) {
   const { error } = await supabase.rpc('use_digital_attack_damage', { p_action_id: actionId });
   if (error) throw error;
 }
+
+// ============================================================
+// CONTROLE DE MESA v0.8.4
+// ============================================================
+export async function getCombatResolutionRollPrompt(actionId) {
+  const { data, error } = await supabase.rpc('get_combat_resolution_roll_prompt', { p_action_id: actionId });
+  if (error) throw error;
+  return data || { steps: [] };
+}
+
+export async function setCombatResolutionDice(actionId, tokens=[]) {
+  const { error } = await supabase.rpc('set_combat_resolution_dice', {
+    p_action_id: actionId,
+    p_queue: Array.isArray(tokens) ? tokens : [],
+  });
+  if (error) throw error;
+}
+
+export async function clearCombatResolutionDice(actionId) {
+  const { error } = await supabase.rpc('clear_combat_resolution_dice', { p_action_id: actionId });
+  if (error) throw error;
+}
+
+export async function getTableControlRerollPrompt(encounterId, actorCharacterId, specialAction) {
+  const { data, error } = await supabase.rpc('get_table_control_reroll_prompt', {
+    p_encounter_id: encounterId,
+    p_actor_character_id: actorCharacterId,
+    p_special_action: specialAction,
+  });
+  if (error) throw error;
+  return data || { groups: [] };
+}
+
+export async function getStartTurnRollPrompt(participantId) {
+  const { data, error } = await supabase.rpc('get_start_turn_roll_prompt', { p_participant_id: participantId });
+  if (error) throw error;
+  return data || { groups: [] };
+}
+
+export async function setCombatReactionsEnabled(encounterId, participantId, enabled) {
+  const { data, error } = await supabase.rpc('set_combat_reactions_enabled', {
+    p_encounter_id: encounterId,
+    p_participant_id: participantId,
+    p_enabled: Boolean(enabled),
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function masterOverrideCombatAction(actionId, decision, publicText='') {
+  const { data, error } = await supabase.rpc('master_override_combat_action', {
+    p_action_id: actionId,
+    p_decision: decision,
+    p_public_text: publicText || null,
+  });
+  if (error) throw error;
+  return data;
+}

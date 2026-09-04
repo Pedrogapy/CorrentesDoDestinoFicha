@@ -187,14 +187,63 @@ export async function runWithRollChoice(choice,operation) {
   finally{await api.clearManualDiceQueue().catch(()=>{});}
 }
 
-export async function finishPhysicalAttack(actionId,title='Dano do ataque') {
-  if(!actionId)return;
-  await api.markPhysicalAttack(actionId);
+export async function chooseAttackDamageRoll(actionId,title='Dano do ataque') {
+  if(!actionId)return {source:'none',tokens:[]};
   const prompt=await api.getPhysicalAttackPrompt(actionId);
-  if(!prompt?.needs_damage)return;
-  const tokens=await enterPhysicalDiceGroups({title,groups:Array.isArray(prompt.groups)?prompt.groups:[]});
-  if(tokens===null){await api.useDigitalAttackDamage(actionId);return;}
-  await api.setPhysicalAttackDamage(actionId,tokens);
+  if(!prompt?.needs_damage)return {source:'none',tokens:[]};
+  const choice=await chooseDiceRoll({
+    title,
+    groups:Array.isArray(prompt.groups)?prompt.groups:[],
+    details:'Escolha novamente: o acerto e o dano podem usar fontes diferentes. Modificadores continuam automáticos.',
+  });
+  if(!choice)return null;
+  if(choice.source==='physical'){
+    await api.markPhysicalAttack(actionId);
+    await api.setPhysicalAttackDamage(actionId,choice.tokens);
+  }else{
+    await api.useDigitalAttackDamage(actionId);
+  }
+  return choice;
+}
+
+// Mantido para compatibilidade com trechos antigos. A versão v0.8.4 sempre
+// oferece Site / dados físicos também para o dano, independentemente do d20.
+export async function finishPhysicalAttack(actionId,title='Dano do ataque') {
+  return chooseAttackDamageRoll(actionId,title);
+}
+
+export async function chooseResolutionRoll({actionId,title='Reduções e resistências'}={}) {
+  if(!actionId)return {source:'none',tokens:[]};
+  const prompt=await api.getCombatResolutionRollPrompt(actionId);
+  const steps=Array.isArray(prompt?.steps)?prompt.steps:[];
+  if(!steps.length)return {source:'none',tokens:[]};
+  const diceGroups=steps.filter(s=>s.kind==='dice').map(s=>({label:s.label||'Redução',count:Number(s.count||0),sides:Number(s.sides||0)}));
+  const d20Specs=steps.filter(s=>s.kind==='d20').map(s=>({label:s.label||'Resistência',mode:s.mode||'normal',count:Number(s.count||1)}));
+  // O motor consome primeiro todas as reduções de dano e, depois, a resistência
+  // pós-acerto. A ordem abaixo espelha exatamente o backend.
+  const formula=[
+    ...diceGroups.map(g=>`${g.count}d${g.sides} (${g.label})`),
+    ...d20Specs.map(s=>`${d20Formula(s.mode,s.count)} (${s.label})`),
+  ].join(' + ');
+  if(!formula)return {source:'none',tokens:[]};
+  const choice=await modal({title,body:choiceBody(formula,'Estas rolagens pertencem à resolução do alvo. O site continua aplicando modificadores, reduções fixas e CD.'),ready:(overlay,finish)=>{
+    overlay.querySelector('[data-md-digital]').onclick=()=>finish({source:'digital',tokens:[]});
+    overlay.querySelector('[data-md-physical]').onclick=()=>{
+      const area=overlay.querySelector('[data-md-area]');
+      area.style.display='';
+      area.innerHTML=`<form data-md-form><div class="list">${diceGroupFields(diceGroups)}${d20Fields(d20Specs)}</div><button class="btn good" style="margin-top:10px">Confirmar dados físicos</button></form>`;
+      bindGroupModes(overlay,diceGroups);
+      area.querySelector('[data-md-form]').onsubmit=e=>{
+        e.preventDefault();
+        try{finish({source:'physical',tokens:[...collectGroups(overlay,diceGroups),...collectD20(overlay,d20Specs)]});}
+        catch(err){alert(err.message);}
+      };
+    };
+  }});
+  if(!choice)return null;
+  if(choice.source==='physical')await api.setCombatResolutionDice(actionId,choice.tokens);
+  else await api.clearCombatResolutionDice(actionId);
+  return choice;
 }
 
 export function mergedPhysicalConfig(base={},overloadKey=null) {
@@ -230,16 +279,33 @@ export async function chooseAbilityRoll({title,cfg={},options={}}) {
     });
   }
 
-  if(cfg.contest&&typeof cfg.contest==='object') return chooseD20Roll({title,mode:'normal',count:1,label:'Seu teste resistido',details:'Você pode rolar seu próprio d20. O d20 do oponente continua automático porque o teste resistido é resolvido dentro do mesmo RPC.'});
+  if(cfg.contest&&typeof cfg.contest==='object') return chooseD20RollSet({
+    title,
+    specs:[
+      {label:'Teste do usuário',mode:'normal',count:1},
+      {label:'Resistência do alvo',mode:'normal',count:1},
+    ],
+    details:'O teste resistido possui dois d20. Você pode deixar ambos para o site ou informar os dois resultados físicos; o Mestre ainda pode ajustar o desfecho pelo painel.',
+  });
   const groups=[];
   if(Number(cfg.self_damage_dice_count||0)>0&&Number(cfg.self_damage_die||0)>1) groups.push({label:'Dano próprio',count:Number(cfg.self_damage_dice_count),sides:Number(cfg.self_damage_die)});
   if(Number(cfg.healing_dice_count||0)>0&&Number(cfg.healing_die||0)>1) groups.push({label:'Cura',count:Number(cfg.healing_dice_count),sides:Number(cfg.healing_die)});
   return chooseDiceRoll({title,groups,details:'O site continua aplicando custos, modificadores e efeitos.'});
 }
 
-export async function chooseEquipmentEffectRoll({title,cfg={}}) {
-  if(cfg.requires_attack) return chooseD20Roll({title,mode:'normal',count:1,label:'Teste de ataque',details:'Informe o d20 natural. O dano físico será solicitado em seguida se acertar.'});
+export async function chooseEquipmentEffectRoll({title,cfg={},encounterId=null,actorId=null}={}) {
+  if(cfg.requires_attack) return chooseD20Roll({title,mode:'normal',count:1,label:'Teste de ataque',details:'Informe o d20 natural. O dano terá uma escolha separada se o ataque acertar.'});
+  const special=String(cfg.special_action||'');
+  if(['reroll_recent_attack_against_self','reroll_recent_natural_one'].includes(special)){
+    return chooseD20Roll({title,mode:'normal',count:1,label:'Nova rolagem',details:'O segundo resultado deve ser mantido. Informe apenas o d20 natural.'});
+  }
+  if(special==='reroll_recent_damage' && encounterId && actorId){
+    const prompt=await api.getTableControlRerollPrompt(encounterId,actorId,special);
+    const groups=Array.isArray(prompt?.groups)?prompt.groups:[];
+    return chooseDiceRoll({title,groups,details:'Role novamente apenas os dados que o efeito manda rerrolar. Modificadores e reduções continuam automáticos.'});
+  }
   const groups=[];
+  if(Number(cfg.self_damage_dice_count||0)>0&&Number(cfg.self_damage_die||0)>1) groups.push({label:'Dano próprio',count:Number(cfg.self_damage_dice_count),sides:Number(cfg.self_damage_die)});
   if(Number(cfg.healing_dice_count||0)>0&&Number(cfg.healing_die||0)>1) groups.push({label:'Cura',count:Number(cfg.healing_dice_count),sides:Number(cfg.healing_die)});
   return chooseDiceRoll({title,groups,details:'Cargas, custos e modificadores continuam automáticos.'});
 }
@@ -256,14 +322,23 @@ export async function chooseResourceRechargeRoll({title,recharge}) {
 }
 
 export async function chooseBombRoll({title,effect}) {
-  if (effect?.bomb_roll) {
-    const { count, sides, target_count: targets } = effect.bomb_roll;
-    return chooseDiceRoll({title,groups:Array.from({length:targets},(_,i)=>({label:`Explosão — alvo ${i+1}`,count,sides})),details:'Uma rolagem por alvo.'});
-  }
   const data=effect?.data||{};
-  const ids=Array.isArray(data.target_ids)?data.target_ids:[];
-  const count=Number(data.damage_dice_count||0),sides=Number(data.damage_die||0);
+  const meta=effect?.bomb_roll||{};
+  const count=Number(meta.count??data.damage_dice_count??0);
+  const sides=Number(meta.sides??data.damage_die??0);
+  const targetCount=Number(meta.target_count??(Array.isArray(data.target_ids)?data.target_ids.length:0));
   if(count<=0||sides<=1)return {source:'none',tokens:[]};
-  const groups=(ids.length?ids:[null]).map((_,i)=>({label:ids.length>1?`Explosão — alvo ${i+1}`:'Explosão',count,sides}));
-  return chooseDiceRoll({title,groups,details:'Uma rolagem por alvo, na mesma ordem dos alvos da bomba.'});
+  const damageGroups=[{label:'Dano da explosão',count,sides}];
+  const defenseSpecs=Array.from({length:Math.max(0,targetCount)},(_,i)=>({label:`Resistência do alvo ${i+1}`,mode:'normal',count:1}));
+  const formula=[`${count}d${sides} (dano)`,...defenseSpecs.map((_,i)=>`1d20 (resistência ${i+1})`)].join(' + ');
+  return modal({title,body:choiceBody(formula,'A explosão rola o dano uma vez e depois uma resistência para cada alvo, exatamente nesta ordem.'),ready:(overlay,finish)=>{
+    overlay.querySelector('[data-md-digital]').onclick=()=>finish({source:'digital',tokens:[]});
+    overlay.querySelector('[data-md-physical]').onclick=()=>{
+      const area=overlay.querySelector('[data-md-area]');
+      area.style.display='';
+      area.innerHTML=`<form data-md-form><div class="list">${diceGroupFields(damageGroups)}${d20Fields(defenseSpecs)}</div><button class="btn good" style="margin-top:10px">Confirmar dados físicos</button></form>`;
+      bindGroupModes(overlay,damageGroups);
+      area.querySelector('[data-md-form]').onsubmit=e=>{e.preventDefault();try{finish({source:'physical',tokens:[...collectGroups(overlay,damageGroups),...collectD20(overlay,defenseSpecs)]});}catch(err){alert(err.message);}};
+    };
+  }});
 }

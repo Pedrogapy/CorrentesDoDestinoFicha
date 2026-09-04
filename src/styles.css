@@ -636,3 +636,253 @@ select[multiple]{
   .combat-board-token { min-width:28px; min-height:28px; }
 }
 .grid[hidden], [data-improv-kinds][hidden] { display: none !important; }
+
+/* ============================================================
+   CONTROLE DE MESA v0.8.4 — painel lateral e overrides
+   ============================================================ */
+.combat-live-fab {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 160;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  padding: 11px 15px;
+  min-width: 106px;
+  font-weight: 950;
+  letter-spacing: .02em;
+  box-shadow: var(--shadow);
+}
+.combat-live-fab:hover { transform: translateY(-1px); }
+.combat-live-panel {
+  position: fixed;
+  z-index: 155;
+  top: 78px;
+  right: 14px;
+  bottom: 72px;
+  width: min(390px, calc(100vw - 28px));
+  overflow: auto;
+  background: rgba(13,13,16,.98);
+  border: 1px solid var(--line);
+  box-shadow: 0 26px 70px rgba(0,0,0,.5);
+  padding: 14px;
+  transform: translateX(calc(100% + 34px));
+  transition: transform .2s ease;
+  backdrop-filter: blur(12px);
+}
+.combat-live-panel.is-open { transform: translateX(0); }
+.combat-live-head {
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+  padding-bottom:12px;
+  border-bottom:1px solid var(--line);
+}
+.combat-live-eyebrow {
+  color: var(--accent);
+  font-size: .68rem;
+  font-weight: 950;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.combat-live-reaction {
+  margin: 12px 0;
+  border: 1px solid var(--line);
+  padding: 9px 10px;
+  font-size: .82rem;
+}
+.combat-live-reaction.allowed { border-color: #3c6e48; }
+.combat-live-reaction.blocked { border-color: #8b313a; }
+.combat-live-current {
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  padding: 13px;
+}
+.combat-live-current.is-pending {
+  border-color: #8e7330;
+  box-shadow: inset 3px 0 0 var(--warn);
+}
+.combat-live-title { font-weight: 950; font-size: 1rem; }
+.combat-live-label { color: var(--muted); margin-top: 3px; font-size: .82rem; }
+.combat-live-roll {
+  margin-top: 10px;
+  display:flex;
+  justify-content:space-between;
+  gap:8px;
+  flex-wrap:wrap;
+  padding:9px;
+  background:#0b0b0e;
+  border:1px solid #303038;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-weight:850;
+}
+.combat-live-status {
+  margin-top: 10px;
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  font-size:.78rem;
+}
+.combat-live-result { margin-top:8px; font-size:1rem; }
+.combat-live-sub,.combat-live-summary { margin-top:7px; color:#c6c2cb; font-size:.82rem; line-height:1.4; }
+.combat-live-summary { padding-top:7px; border-top:1px dashed #3a3a42; }
+.combat-live-empty { color:var(--muted); padding:12px 0; }
+.combat-live-effects { margin-top: 12px; border:1px solid var(--line); padding:10px; }
+.combat-live-effects summary { cursor:pointer; font-weight:850; }
+.combat-live-effect-list { display:grid; gap:6px; margin-top:9px; font-size:.8rem; }
+.combat-live-effect-list > div { padding:7px; background:#0d0d11; border-left:2px solid var(--accent); }
+.combat-live-recent { margin-top:14px; }
+.combat-live-recent-row {
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+  padding:8px 0;
+  border-bottom:1px solid #292930;
+  font-size:.78rem;
+}
+.combat-live-recent-row strong { text-align:right; }
+.master-override-row {
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  margin-top:9px;
+  padding-top:9px;
+  border-top:1px dashed #44444c;
+}
+.reaction-master-toggle {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-top:8px;
+  padding:7px 8px;
+  border:1px solid #393942;
+  background:#0d0d11;
+  font-size:.78rem;
+  font-weight:800;
+}
+.reaction-master-toggle input { width:auto; }
+
+@media (max-width: 700px) {
+  .combat-live-panel { top: 72px; right: 8px; bottom: 66px; width: calc(100vw - 16px); }
+  .combat-live-fab { right: 10px; bottom: 10px; }
+}
+
+/* ============================================================
+   CONTROLE DE MESA v0.8.4 R4 — ações contextuais no painel Agora
+   ============================================================ */
+.combat-live-available {
+  margin: 12px 0;
+  border: 1px solid #383842;
+  background: #101014;
+  padding: 11px;
+}
+.combat-live-available-title {
+  font-weight: 900;
+  font-size: .88rem;
+  margin-bottom: 9px;
+}
+.combat-live-actions {
+  display: grid;
+  gap: 7px;
+}
+.combat-live-action-group {
+  margin-top: 5px;
+  padding-top: 8px;
+  border-top: 1px solid #2c2c34;
+  color: var(--muted);
+  font-size: .66rem;
+  font-weight: 950;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.combat-live-action-group:first-child {
+  border-top: 0;
+  padding-top: 0;
+  margin-top: 0;
+}
+.combat-live-action-row {
+  border: 1px solid #32323a;
+  background: #0b0b0f;
+}
+.combat-live-action-button {
+  width: 100%;
+  border: 0;
+  border-left: 3px solid var(--accent);
+  background: #17171d;
+  color: var(--text);
+  padding: 10px 11px;
+  text-align: left;
+  font: inherit;
+  font-size: .82rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+.combat-live-action-button:hover {
+  background: #202027;
+}
+.combat-live-action-config {
+  padding: 10px;
+  border-top: 1px solid #32323a;
+  background: #0e0e12;
+}
+.combat-live-action-fields {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 9px;
+}
+.combat-live-field {
+  display: grid;
+  gap: 4px;
+  font-size: .72rem;
+  font-weight: 800;
+  color: #c9c7d0;
+}
+.combat-live-field select,
+.combat-live-field input {
+  width: 100%;
+  min-width: 0;
+}
+.combat-live-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 7px;
+  border: 1px solid #303038;
+  background: #131318;
+  font-size: .72rem;
+  line-height: 1.35;
+}
+.combat-live-check input {
+  width: auto;
+  margin-top: 2px;
+}
+.combat-live-execute {
+  width: 100%;
+}
+.combat-live-no-actions {
+  color: var(--muted);
+  font-size: .78rem;
+  line-height: 1.45;
+  padding: 8px 2px;
+}
+.combat-live-reaction {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.combat-live-reaction-control {
+  border: 1px solid #4a4a54;
+  background: #18181e;
+  color: var(--text);
+  padding: 5px 8px;
+  font: inherit;
+  font-size: .7rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+.combat-live-reaction-control:hover { background:#22222a; }

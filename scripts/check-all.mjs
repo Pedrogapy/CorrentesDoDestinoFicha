@@ -5,7 +5,7 @@ const checks = [
   ['check-player-mechanics.mjs'], ['check-combat-visibility.mjs'],
   ['check-tactical-board.mjs'], ['check-antonio.mjs'],
   ['sync-condition-catalog.mjs','--check'], ['check-improvised-combat.mjs'], ['check-improvised-ui.mjs'],
-  ['check-effect-coverage.mjs'],
+  ['check-effect-coverage.mjs'], ['check-table-control.mjs'],
 ];
 let failures=0;
 for (const [script,...args] of checks) {
