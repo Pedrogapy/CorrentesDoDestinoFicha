@@ -2,6 +2,7 @@ import {
   createBalancedBuild,
   validateBuild,
   characterDerived,
+  defenseBreakdown,
   attributePointBudget,
   skillPointBudget,
   growthPointBudget,
@@ -12,6 +13,8 @@ import {
   weaponAttackConfig,
   weaponDamageProfile,
   equipmentAttunementCapacity,
+  SKILL_BY_KEY,
+  ATTRIBUTE_BY_KEY,
 } from '../src/lib/system.js';
 
 for (const level of [1,5,25,50,75,100]) {
@@ -36,6 +39,39 @@ for (const level of [1,5,25,50,75,100]) {
   console.log(`Nível ${level}:`, characterDerived(character), slotBudget(level));
 }
 
+// Mapeamento defensivo canônico.
+if (SKILL_BY_KEY.defend?.attribute !== 'strength') throw new Error('Defesa precisa pertencer a Força.');
+if (SKILL_BY_KEY.defend?.name !== 'Defesa') throw new Error('A perícia defend precisa ser exibida como Defesa.');
+if (SKILL_BY_KEY.reflexes?.attribute !== 'dexterity') throw new Error('Reflexos precisa pertencer a Destreza.');
+if (SKILL_BY_KEY.fortitude?.attribute !== 'resistance') throw new Error('Fortitude precisa pertencer a Resistência.');
+if (SKILL_BY_KEY.reinforcement?.attribute !== 'cursed_control') throw new Error('Reforço precisa pertencer a Conhecimento Amaldiçoado.');
+if (ATTRIBUTE_BY_KEY.cursed_control?.name !== 'Conhecimento Amaldiçoado') throw new Error('cursed_control precisa ser exibido como Conhecimento Amaldiçoado.');
+
+const defenseProbe = {
+  level: 5,
+  attributes: {
+    strength: 10,
+    dexterity: 2,
+    resistance: 4,
+    intelligence: 1,
+    perception: 1,
+    will: 1,
+    presence: 1,
+    cursed_control: 6,
+  },
+  skills: { defend: 3, reflexes: 1, fortitude: 2, reinforcement: 2 },
+  growth_vigor: 0,
+  growth_reserve: 0,
+  permanent_ps_bonus: 0,
+  permanent_ea_bonus: 0,
+};
+const defense = defenseBreakdown(defenseProbe);
+if (defense.defend !== 18) throw new Error(`Defesa deveria ser 18 (Força + Defesa), recebeu ${defense.defend}.`);
+if (defense.reflex !== 12) throw new Error(`Reflexos deveria ser 12, recebeu ${defense.reflex}.`);
+if (defense.fortitude !== 14) throw new Error(`Fortitude deveria ser 14, recebeu ${defense.fortitude}.`);
+if (defense.reinforcement !== 15) throw new Error(`Reforço deveria ser 15, recebeu ${defense.reinforcement}.`);
+if (defense.ca !== 18) throw new Error(`CA deveria usar a maior defesa (18), recebeu ${defense.ca}.`);
+
 const expectedEquipmentVp = { 'Sem Grau':0, 'Grau 4':2, 'Grau 3':4, 'Grau 2':6, 'Grau 1':9, 'Grau Especial':12 };
 for (const [grade,expected] of Object.entries(expectedEquipmentVp)) {
   if (equipmentVpBudget(grade,true)!==expected) throw new Error(`VP de equipamento incorreto para ${grade}`);
@@ -59,4 +95,4 @@ for (const [level,expected] of Object.entries(attunementExpected)) {
   if (equipmentAttunementCapacity(Number(level))!==expected) throw new Error(`Sintonia incorreta no nível ${level}`);
 }
 
-console.log('OK: fórmulas básicas, dano de armas, Sintonia, equipamentos e distribuições neutras válidas.');
+console.log('OK: fórmulas básicas, novo mapeamento defensivo, dano de armas, Sintonia, equipamentos e distribuições neutras válidas.');
