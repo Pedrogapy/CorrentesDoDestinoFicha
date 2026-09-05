@@ -16,7 +16,7 @@ Projeto inicial do sistema próprio de TTRPG e da ficha digital da campanha **Co
 - Níveis 1–100
 - Atributos e perícias universais com compêndio dentro do site
 - PS, EA, CA e PA calculados automaticamente
-- CA calculada pela melhor defesa passiva entre Reflexos, Defender, Fortitude e Reforço
+- CA calculada pela melhor defesa passiva entre **Força + Defesa**, **Destreza + Reflexos**, **Resistência + Fortitude** e **Conhecimento Amaldiçoado + Reforço**
 - Redistribuição de atributos/perícias/crescimento fora de sessão
 - XP único e botão de subir de nível
 - Separação de Vigor e Reserva
@@ -50,6 +50,7 @@ Os segredos do mestre ficam em `character_master_secrets` e `master_progress_tra
 ## Observações de design
 
 - Grau Jujutsu é burocrático e separado do nível.
+- A chave interna `cursed_control` é mantida por compatibilidade, mas o nome apresentado no sistema é **Conhecimento Amaldiçoado**.
 - Kokusen não é habilidade aprendível. Apenas um 20 natural elegível pode gerar Kokusen.
 - Crítico forçado continua sendo crítico, mas não vira Kokusen.
 - A estrutura do banco já possui `campaigns.system_key` para facilitar outro sistema no futuro, mas a interface atual apresenta somente Correntes do Destino.
