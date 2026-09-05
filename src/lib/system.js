@@ -56,9 +56,9 @@ export const ATTRIBUTES = [
   },
   {
     key: 'cursed_control',
-    name: 'Controle Amaldiçoado',
+    name: 'Conhecimento Amaldiçoado',
     description:
-      'Precisão e domínio com que o personagem manipula sua própria Energia Amaldiçoada. Não representa o tamanho de sua reserva.',
+      'Conhecimento e domínio prático dos princípios da Energia Amaldiçoada, incluindo sua condução, aplicação e manipulação. Não representa o tamanho da reserva.',
   },
 ];
 
@@ -68,6 +68,7 @@ export const SKILLS = [
   ['fight', 'Lutar', 'strength', 'Treinamento e eficiência em combate corpo a corpo, desarmado ou utilizando armas de combate próximo.'],
   ['grapple', 'Agarrar', 'strength', 'Capacidade de prender, conter ou controlar fisicamente outro corpo e de disputar agarrões.'],
   ['impact', 'Impacto', 'strength', 'Capacidade de aplicar força de maneira concentrada para quebrar, empurrar, deslocar ou afetar fisicamente objetos e estruturas.'],
+  ['defend', 'Defesa', 'strength', 'Capacidade de bloquear, aparar ou interceptar fisicamente ataques utilizando força, postura, corpo, arma ou meio apropriado.'],
 
   // Destreza
   ['acrobatics', 'Acrobacia', 'dexterity', 'Controle corporal durante movimentos complexos, equilíbrio, aterrissagens e reposicionamentos físicos.'],
@@ -76,7 +77,6 @@ export const SKILLS = [
   ['aim', 'Pontaria', 'dexterity', 'Precisão ao direcionar ataques, projéteis, objetos ou efeitos que dependam de mira.'],
 
   // Resistência
-  ['defend', 'Defender', 'resistance', 'Capacidade de bloquear, aparar ou interceptar fisicamente ataques utilizando postura, corpo, arma ou meio apropriado.'],
   ['fortitude', 'Fortitude', 'resistance', 'Capacidade do corpo de suportar dano, dor, exaustão, agentes nocivos e outras formas de desgaste físico.'],
   ['steadiness', 'Firmeza', 'resistance', 'Capacidade de manter posição, equilíbrio e controle corporal contra efeitos que tentem deslocar, derrubar ou desestabilizar.'],
   ['survival', 'Sobrevivência', 'resistance', 'Capacidade de preservar o próprio corpo e operar adequadamente em ambientes hostis ou situações prolongadas de privação.'],
@@ -107,7 +107,7 @@ export const SKILLS = [
   ['leadership', 'Liderança', 'presence', 'Capacidade de coordenar, orientar e influenciar coletivamente outras pessoas.'],
   ['performance', 'Performance', 'presence', 'Capacidade de executar apresentações, interpretações e formas deliberadas de expressão artística ou pública.'],
 
-  // Controle Amaldiçoado
+  // Conhecimento Amaldiçoado
   ['channeling', 'Canalização', 'cursed_control', 'Capacidade de conduzir, concentrar, transferir e manipular diretamente o fluxo de Energia Amaldiçoada.'],
   ['reinforcement', 'Reforço', 'cursed_control', 'Capacidade de aplicar Energia Amaldiçoada para fortalecer corpo, objetos, armas ou estruturas. Também representa a aplicação defensiva dessa energia.'],
   ['technique_control', 'Controle de Técnica', 'cursed_control', 'Capacidade de operar com precisão os fenômenos e efeitos produzidos pela própria Técnica Amaldiçoada.'],
@@ -393,16 +393,16 @@ export function calculateEA(character) {
 export function defenseBreakdown(character) {
   const attrs = character.attributes || {};
   const skills = character.skills || {};
+  const defend = 10 + attributeModifier(attrs.strength) + Number(skills.defend || 0);
   const reflex = 10 + attributeModifier(attrs.dexterity) + Number(skills.reflexes || 0);
-  const defend = 10 + attributeModifier(attrs.resistance) + Number(skills.defend || 0);
   const fortitude = 10 + attributeModifier(attrs.resistance) + Number(skills.fortitude || 0);
   const reinforcement = 10 + attributeModifier(attrs.cursed_control) + Number(skills.reinforcement || 0);
   return {
-    reflex,
     defend,
+    reflex,
     fortitude,
     reinforcement,
-    ca: Math.max(reflex, defend, fortitude, reinforcement),
+    ca: Math.max(defend, reflex, fortitude, reinforcement),
   };
 }
 
