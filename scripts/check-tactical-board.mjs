@@ -14,7 +14,7 @@ const checks = [
   [sql.includes('move_combat_token') && sql.includes('Somente o Mestre pode mover peças'), 'movimento protegido no banco'],
   [sql.includes('protect_combat_board_position_trigger'), 'trigger anti-movimento de player'],
   [sql.includes('set_combat_board_state'), 'edição de terreno protegida'],
-  [sql.includes('board_x int,') && sql.includes('board_y int\n)'), 'roster público com posição'],
+  [sql.includes('board_x int,') && /board_y int\s*\)/.test(sql), 'roster público com posição'],
   [api.includes('export async function moveCombatToken') && api.includes('withCombatUndo'), 'movimento ligado ao Undo'],
   [api.includes('export async function setCombatBoardState'), 'API de terreno'],
   [ui.includes('combatBoardHtml({encounter:active,tokens:targets') && ui.includes('editable:false'), 'tabuleiro read-only do player'],
