@@ -1,9 +1,9 @@
 -- Correntes do Destino — mapeamento defensivo 2026-09-04
 --
 -- Relações canônicas após a CA:
---   Força                  -> Defesa
---   Destreza               -> Reflexos
---   Resistência            -> Fortitude
+--   Força                    -> Defesa
+--   Destreza                 -> Reflexos
+--   Resistência              -> Fortitude
 --   Conhecimento Amaldiçoado -> Reforço
 --
 -- A chave técnica `cursed_control` é preservada para não quebrar fichas,
@@ -20,6 +20,7 @@ update public.system_skills
 set name = 'Defesa',
     attribute_key = 'strength',
     description = 'Capacidade de bloquear, aparar ou interceptar fisicamente ataques utilizando força, postura, corpo, arma ou meio apropriado.',
+    sort_order = 105,
     updated_at = now()
 where key = 'defend';
 
