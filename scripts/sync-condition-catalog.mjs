@@ -14,7 +14,7 @@ const values = rows =>
 const migrationPath =
   'supabase/migrations/202609020001_improvised_combat.sql';
 
-const block = `-- GENERIC_CONDITIONS
+const blockLf = `-- GENERIC_CONDITIONS
 insert into public.system_conditions(key,name,description) values
 ${values(conditions)}
 on conflict(key) do update set
@@ -28,6 +28,8 @@ where key in (${conditions.map(c => quote(c.key)).join(',')});
 -- END_GENERIC_CONDITIONS`;
 
 const source = fs.readFileSync(migrationPath, 'utf8');
+const eol = source.includes('\r\n') ? '\r\n' : '\n';
+const block = blockLf.replace(/\n/g, eol);
 
 if (!source.includes('-- GENERIC_CONDITIONS') ||
     !source.includes('-- END_GENERIC_CONDITIONS')) {
