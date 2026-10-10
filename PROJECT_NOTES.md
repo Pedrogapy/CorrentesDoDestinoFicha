@@ -213,3 +213,19 @@ Regras canônicas implementadas no site:
 - Dano/cura aceita cada dado ou a soma dos dados sem modificadores.
 - Ataques guardam dano físico até a reação do alvo.
 - Rolagens automáticas sem clique do player continuam digitais.
+
+
+## v0.8.7 — auditoria de lógica, UX e ficha em PDF
+
+- Navegação reorganizada por intenção para jogadores e Mestre; no celular, destinos principais ficam na barra e opções secundárias em **Mais**.
+- Painel do Mestre dividido em Visão geral, Fichas e Aprovações para reduzir mistura entre condução da sessão, edição e filas administrativas.
+- Fichas recebem assinatura visual discreta e determinística; atributos e perícias dominantes são destacados sem criar bônus mecânicos.
+- Exportação **Baixar PDF** gera a ficha no navegador, sem serviço externo e sem nova dependência.
+- Combate: painel **Agora** inicia recolhido, abre automaticamente em reação pendente e o histórico completo fica separado do fluxo atual.
+- Realtime também observa `combat_participants`, evitando estado visual atrasado após ajustes de PS/EA/PA, lado, visibilidade ou tabuleiro.
+- Validação da build rejeita números fracionários/negativos inválidos; estimador de VP não duplica custo de confiabilidade/crítico.
+- Terminologia pública padronizada para **Controle Amaldiçoado** e **Defender**.
+- Criação de ficha filha só é oferecida quando existe Manifestação aprovada, refletindo a proteção que já existia no banco.
+- Progresso oculto usa conflito `(character_id,key)` corretamente; revisão de habilidades foi centralizada em `api.js`; upload de imagem valida tipo e limite de 8 MB.
+- GitHub Pages executa `npm test` antes do build.
+- A autenticação atual foi mantida por compatibilidade; troca de política de senha exige migração planejada para não invalidar acessos existentes.

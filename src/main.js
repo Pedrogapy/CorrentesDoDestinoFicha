@@ -26,6 +26,7 @@ import {
 } from './lib/system.js';
 import { renderTestsPage, quickSkillRoll, renderPlayerCombatPageV2, renderMasterCombatPageV2, abilityCombatConfigFields, abilityConfigFromForm } from './lib/combat-ui.js';
 import { renderPlayerEquipmentPage, renderMasterEquipmentManager, pendingEquipmentQueueHtml, bindPendingEquipmentQueue } from './lib/equipment-ui.js';
+import { downloadCharacterPdf, characterAccent } from './lib/character-pdf.js';
 
 const app = document.querySelector('#app');
 
@@ -45,27 +46,51 @@ const state = {
   summonSelected: null,
   realtimeChannel: null,
   loading: false,
+  loadingCount: 0,
 };
 
-const playerTabs = [
-  ['sheet', 'Ficha'],
-  ['tests', 'Testes'],
-  ['system', 'Sistema'],
-  ['abilities', 'Habilidades'],
-  ['training', 'Treino'],
-  ['vows', 'Votos'],
-  ['equipment', 'Inventário'],
-  ['combat', 'Combate'],
-  ['history', 'Histórico'],
+const playerNavGroups = [
+  { label:'Personagem', items:[['sheet','Ficha'],['abilities','Habilidades'],['equipment','Inventário']] },
+  { label:'Mesa', items:[['combat','Combate'],['tests','Testes']] },
+  { label:'Desenvolvimento', items:[['training','Treino'],['vows','Votos']] },
+  { label:'Consulta', items:[['system','Regras'],['history','Histórico']] },
 ];
 
-const masterTabs = [
-  ['master', 'Mestre'],
-  ['tests', 'Testes'],
-  ['system', 'Sistema'],
-  ['combat', 'Combate'],
-  ['history', 'Histórico'],
+const masterNavGroups = [
+  { label:'Mesa', items:[['master','Visão geral'],['combat','Combate']] },
+  { label:'Gestão', items:[['roster','Fichas'],['approvals','Aprovações']] },
+  { label:'Consulta', items:[['tests','Testes'],['system','Regras'],['history','Histórico']] },
 ];
+
+const flattenNav = groups => groups.flatMap(group => group.items);
+const playerTabs = flattenNav(playerNavGroups);
+const masterTabs = flattenNav(masterNavGroups);
+const playerMobilePrimary = new Set(['sheet','combat','abilities','equipment']);
+const masterMobilePrimary = new Set(['master','combat','roster','approvals']);
+
+function normalizeUiSearch(value='') {
+  return String(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+}
+
+function navButtonHtml(key,name,active=false,extra='') {
+  return `<button class="nav-btn ${active?'active':''}" data-tab="${key}" ${extra}>${name}</button>`;
+}
+
+function groupedSidebarHtml(groups,activeKey) {
+  return groups.map(group=>`<div class="nav-section"><div class="nav-section-label">${group.label}</div>${group.items.map(([key,name])=>navButtonHtml(key,name,activeKey===key)).join('')}</div>`).join('');
+}
+
+function mobileNavigationHtml(groups,activeKey,isMaster) {
+  const primary=isMaster?masterMobilePrimary:playerMobilePrimary;
+  const all=flattenNav(groups);
+  const direct=all.filter(([key])=>primary.has(key));
+  const rest=groups.map(group=>({label:group.label,items:group.items.filter(([key])=>!primary.has(key))})).filter(group=>group.items.length);
+  return `<nav class="bottom-nav">${direct.map(([key,name])=>navButtonHtml(key,name,activeKey===key)).join('')}<button class="nav-btn ${rest.some(group=>group.items.some(([key])=>key===activeKey))?'active':''}" type="button" data-nav-more aria-expanded="false">Mais</button></nav>
+    <div class="nav-more-drawer" data-nav-drawer hidden>
+      <div class="nav-drawer-head"><strong>Navegação</strong><button class="btn ghost" type="button" data-nav-more-close>Fechar</button></div>
+      <div class="nav-drawer-grid">${rest.map(group=>`<div class="nav-section"><div class="nav-section-label">${group.label}</div>${group.items.map(([key,name])=>navButtonHtml(key,name,activeKey===key)).join('')}</div>`).join('')}</div>
+    </div>`;
+}
 
 function esc(value) {
   return String(value ?? '')
@@ -81,6 +106,8 @@ function toast(message, type = '') {
   if (!wrap) {
     wrap = document.createElement('div');
     wrap.className = 'toast-wrap';
+    wrap.setAttribute('role','status');
+    wrap.setAttribute('aria-live','polite');
     document.body.appendChild(wrap);
   }
   const node = document.createElement('div');
@@ -91,12 +118,16 @@ function toast(message, type = '') {
 }
 
 function showInfoModal(title, body) {
+  const previous=document.activeElement;
   const overlay = document.createElement('div');
   overlay.className = 'overlay';
-  overlay.innerHTML = `<div class="modal"><div class="btn-row" style="justify-content:space-between"><h2>${esc(title)}</h2><button class="btn" data-close-modal>Fechar</button></div><p>${esc(body)}</p></div>`;
+  overlay.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-labelledby="info-modal-title"><div class="btn-row" style="justify-content:space-between"><h2 id="info-modal-title">${esc(title)}</h2><button class="btn" data-close-modal>Fechar</button></div><p>${esc(body)}</p></div>`;
   document.body.appendChild(overlay);
-  overlay.querySelector('[data-close-modal]').onclick = () => overlay.remove();
-  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  const close=()=>{overlay.remove();previous?.focus?.();};
+  overlay.querySelector('[data-close-modal]').onclick = close;
+  overlay.onclick = (e) => { if (e.target === overlay) close(); };
+  overlay.onkeydown = e => { if(e.key==='Escape') close(); };
+  overlay.querySelector('[data-close-modal]')?.focus();
 }
 
 function bindConditionLinks(root = document) {
@@ -136,9 +167,9 @@ function masterEntityGroupsHtml(characters=[]) {
   return MASTER_ENTITY_GROUPS.map(group=>{
     const rows=characters.filter(c=>c.entity_type===group.key);
     if(!rows.length) return '';
-    return `<section class="entity-group entity-group-${group.cls}">
+    return `<section class="entity-group entity-group-${group.cls}" data-master-entity-group>
       <div class="entity-group-head"><div><span class="entity-group-dot"></span><strong>${group.title}</strong></div><span class="pill">${rows.length}</span></div>
-      <div class="list">${rows.map(c=>`<button class="list-item entity-select-card entity-type-${group.cls}" data-select-entity="${c.id}"><div class="btn-row"><div class="title">${esc(getName(c))}</div><span class="entity-type-badge">${group.label}</span></div><div class="meta">Nv ${c.level} • ${esc(c.grade)}</div></button>`).join('')}</div>
+      <div class="list">${rows.map(c=>`<button class="list-item entity-select-card entity-type-${group.cls}" data-select-entity="${c.id}" data-master-entity-card data-search-name="${esc(normalizeUiSearch(getName(c)))}"><div class="btn-row"><div class="title">${esc(getName(c))}</div><span class="entity-type-badge">${group.label}</span></div><div class="meta">Nv ${c.level} • ${esc(c.grade)}</div></button>`).join('')}</div>
     </section>`;
   }).join('') || '<p class="muted">Nenhuma entidade cadastrada.</p>';
 }
@@ -147,8 +178,9 @@ function getName(character) {
 }
 
 async function withBusy(task, successMessage = '') {
-  if (state.loading) return;
+  state.loadingCount = Number(state.loadingCount || 0) + 1;
   state.loading = true;
+  document.documentElement.classList.add('app-busy');
   try {
     const result = await task();
     if (successMessage) toast(successMessage, 'good');
@@ -158,7 +190,9 @@ async function withBusy(task, successMessage = '') {
     toast(error?.message || String(error), 'bad');
     throw error;
   } finally {
-    state.loading = false;
+    state.loadingCount = Math.max(0, Number(state.loadingCount || 1) - 1);
+    state.loading = state.loadingCount > 0;
+    if (!state.loading) document.documentElement.classList.remove('app-busy');
   }
 }
 
@@ -244,7 +278,8 @@ async function loadApp() {
     if (state.profile.role === 'master') {
       state.masterCharacters = await api.listAllCharacters();
       state.character = null;
-      if (state.tab !== 'system' && state.tab !== 'combat' && state.tab !== 'history') state.tab = 'master';
+      const allowedMasterTabs=new Set(masterTabs.map(([key])=>key));
+      if (!allowedMasterTabs.has(state.tab)) state.tab = 'master';
     } else {
       state.character = await api.ensureMyCharacter(state.authSession.user);
       state.editingCharacter = structuredClone(state.character);
@@ -257,7 +292,7 @@ async function loadApp() {
 
 function renderShell() {
   const isMaster = state.profile?.role === 'master';
-  const tabs = isMaster ? masterTabs : playerTabs;
+  const groups = isMaster ? masterNavGroups : playerNavGroups;
   const title = isMaster ? 'Painel do Mestre' : getName(state.character);
 
   app.innerHTML = `
@@ -276,18 +311,33 @@ function renderShell() {
         </div>
       </header>
       <div class="layout">
-        <aside class="sidebar">${tabs.map(([key,name]) => `<button class="nav-btn ${state.tab===key?'active':''}" data-tab="${key}">${name}</button>`).join('')}</aside>
+        <aside class="sidebar">${groupedSidebarHtml(groups,state.tab)}</aside>
         <main class="content" id="page"></main>
       </div>
-      <nav class="bottom-nav">${tabs.map(([key,name]) => `<button class="nav-btn ${state.tab===key?'active':''}" data-tab="${key}">${name}</button>`).join('')}</nav>
+      ${mobileNavigationHtml(groups,state.tab,isMaster)}
     </div>`;
 
+  const closeDrawer=()=>{
+    const drawer=document.querySelector('[data-nav-drawer]');
+    const more=document.querySelector('[data-nav-more]');
+    if(drawer)drawer.hidden=true;
+    more?.setAttribute('aria-expanded','false');
+  };
   document.querySelectorAll('[data-tab]').forEach((button) => {
     button.onclick = () => {
       state.tab = button.dataset.tab;
+      closeDrawer();
       renderShell();
     };
   });
+  document.querySelector('[data-nav-more]')?.addEventListener('click',()=>{
+    const drawer=document.querySelector('[data-nav-drawer]');
+    const more=document.querySelector('[data-nav-more]');
+    if(!drawer)return;
+    drawer.hidden=!drawer.hidden;
+    more?.setAttribute('aria-expanded',drawer.hidden?'false':'true');
+  });
+  document.querySelector('[data-nav-more-close]')?.addEventListener('click',closeDrawer);
   document.querySelector('#logout-btn').onclick = async () => {
     await signOut();
     Object.assign(state, { authSession: null, profile: null, character: null, editingCharacter: null, tab: 'sheet' });
@@ -325,6 +375,8 @@ function renderCurrentPage() {
     }
     case 'history': return renderHistoryPage();
     case 'master': return renderMasterPage();
+    case 'roster': return renderMasterRosterPage();
+    case 'approvals': return renderMasterApprovalsPage();
     default: return renderSystemPage();
   }
 }
@@ -356,6 +408,11 @@ function renderSheetPage() {
 
 function renderCharacterEditor(character, isMasterEditor, root) {
   const validation = validateBuild(character);
+  const accent=characterAccent(character);
+  root.classList.add('character-sheet-page');
+  root.style.setProperty('--sheet-accent',accent.hex);
+  const signatureAttrs=new Set([...ATTRIBUTES].sort((a,b)=>Number(character.attributes?.[b.key]||0)-Number(character.attributes?.[a.key]||0)).slice(0,2).map(a=>a.key));
+  const signatureSkills=new Set([...SKILLS].sort((a,b)=>Number(character.skills?.[b.key]||0)-Number(character.skills?.[a.key]||0)).slice(0,3).map(s=>s.key));
   const respecLocked = !isMasterEditor && Boolean(state.activeSession);
   const attrUsed = ATTRIBUTES.reduce((sum,a)=>sum+Number(character.attributes?.[a.key]||0),0);
   const skillUsed = SKILLS.reduce((sum,s)=>sum+Number(character.skills?.[s.key]||0),0);
@@ -368,7 +425,9 @@ function renderCharacterEditor(character, isMasterEditor, root) {
 
   root.innerHTML = `
     ${pageHeader(isMasterEditor ? 'Editor administrativo' : `Nível ${character.level} • ${character.grade}`, getName(character), `<span class="pill ${validation.valid?'good':'bad'}">${validation.valid?'Build válida':'Revisar build'}</span>`)}
-    <section class="card paper character-hero">
+    <section class="card paper character-hero sheet-hero">
+      <div class="sheet-signature" aria-hidden="true"></div>
+      <div class="sheet-monogram" aria-hidden="true">${esc((character.first_name||character.nickname||'?').slice(0,1).toUpperCase())}</div>
       ${image}
       <div>
         <div class="field-row">
@@ -400,7 +459,7 @@ function renderCharacterEditor(character, isMasterEditor, root) {
         <div class="attribute-grid">
           ${ATTRIBUTES.map(attr => {
             const value=Number(character.attributes?.[attr.key]||1);
-            return `<div class="attribute-card"><div class="name">${attr.name}</div><div class="mod">Modificador +${attributeModifier(value)}</div><div class="stepper"><button data-attr-minus="${attr.key}" ${respecLocked?'disabled':''}>−</button><div class="number">${value}</div><button data-attr-plus="${attr.key}" ${respecLocked?'disabled':''}>+</button></div></div>`;
+            return `<div class="attribute-card ${signatureAttrs.has(attr.key)?'is-signature':''}"><div class="name">${attr.name}</div><div class="mod">Modificador +${attributeModifier(value)}</div><div class="stepper"><button data-attr-minus="${attr.key}" ${respecLocked?'disabled':''}>−</button><div class="number">${value}</div><button data-attr-plus="${attr.key}" ${respecLocked?'disabled':''}>+</button></div></div>`;
           }).join('')}
         </div>
       </div>
@@ -420,13 +479,13 @@ function renderCharacterEditor(character, isMasterEditor, root) {
       <div class="section-head"><h2>Perícias</h2><span class="budget ${skillUsed>skillPointBudget(character.level)?'over':''}">${skillUsed}/${skillPointBudget(character.level)} • máx. ${skillCap(character.level)}</span></div>
       ${ATTRIBUTES.map(attr => `<div class="skills-group"><h3>${attr.name}</h3>${SKILLS.filter(s=>s.attribute===attr.key).map(skill=>{
         const v=Number(character.skills?.[skill.key]||0);
-        return `<div class="skill-line"><div><div class="skill-name">${skill.name}</div><div class="skill-desc">${skill.description}</div></div><div class="skill-actions"><button class="btn ghost" data-quick-skill="${skill.key}" title="Rolar ${skill.name}">🎲</button><div class="stepper"><button data-skill-minus="${skill.key}" ${respecLocked?'disabled':''}>−</button><div class="number">${v}</div><button data-skill-plus="${skill.key}" ${respecLocked?'disabled':''}>+</button></div></div></div>`;
+        return `<div class="skill-line ${signatureSkills.has(skill.key)?'is-signature':''}"><div><div class="skill-name">${skill.name}</div><div class="skill-desc">${skill.description}</div></div><div class="skill-actions"><button class="btn ghost" data-quick-skill="${skill.key}" title="Rolar ${skill.name}">🎲</button><div class="stepper"><button data-skill-minus="${skill.key}" ${respecLocked?'disabled':''}>−</button><div class="number">${v}</div><button data-skill-plus="${skill.key}" ${respecLocked?'disabled':''}>+</button></div></div></div>`;
       }).join('')}</div>`).join('')}
     </section>
 
     <div style="height:14px"></div>
     <section class="grid grid-2">
-      <div class="card"><h2>Técnica Amaldiçoada</h2><label>Nome<input id="tech-name" value="${esc(character.technique_name||'')}" /></label><label style="margin-top:8px">Descrição<textarea id="tech-desc">${esc(character.technique_description||'')}</textarea></label></div>
+      <div class="card sheet-technique-card"><h2>Técnica Amaldiçoada</h2><label>Nome<input id="tech-name" value="${esc(character.technique_name||'')}" /></label><label style="margin-top:8px">Descrição<textarea id="tech-desc">${esc(character.technique_description||'')}</textarea></label></div>
       <div class="card"><h2>Imagem</h2><label>URL da imagem<input id="image-url" value="${esc(character.image_url||'')}" placeholder="https://..." /></label><label style="margin-top:10px">Ou envie uma imagem<input id="image-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" /></label></div>
     </section>
 
@@ -437,7 +496,7 @@ function renderCharacterEditor(character, isMasterEditor, root) {
     </section>
 
     ${validation.valid ? '' : `<div class="notice bad" style="margin-top:14px">${validation.errors.map(esc).join('<br>')}</div>`}
-    <div class="btn-row" style="margin-top:16px"><button class="btn primary" id="save-character">Salvar ficha</button><button class="btn" id="export-character">Exportar JSON</button></div>
+    <div class="btn-row" style="margin-top:16px"><button class="btn primary" id="save-character">Salvar ficha</button><button class="btn" id="download-character-pdf">Baixar PDF</button><button class="btn ghost" id="export-character">Exportar JSON</button></div>
   `;
 
   const rerender = () => renderCharacterEditor(character, isMasterEditor, root);
@@ -458,7 +517,7 @@ function renderCharacterEditor(character, isMasterEditor, root) {
     };
   }
 
-  root.querySelector('#save-character').onclick = async () => {
+  const readCharacterEditorIntoModel=()=>{
     character.first_name=root.querySelector('#char-first').value.trim();
     character.last_name=root.querySelector('#char-last').value.trim();
     character.nickname=root.querySelector('#char-nick').value.trim();
@@ -470,7 +529,6 @@ function renderCharacterEditor(character, isMasterEditor, root) {
     character.goals=root.querySelector('#goals').value;
     character.appearance=root.querySelector('#appearance').value;
     character.notes=root.querySelector('#notes').value;
-
     if (isMasterEditor) {
       character.grade=root.querySelector('#char-grade').value;
       character.level=Number(root.querySelector('#char-level').value);
@@ -479,6 +537,24 @@ function renderCharacterEditor(character, isMasterEditor, root) {
       character.permanent_ps_bonus=Number(root.querySelector('#perm-ps').value);
       character.permanent_ea_bonus=Number(root.querySelector('#perm-ea').value);
     }
+    return character;
+  };
+
+  root.querySelector('#download-character-pdf').onclick=async()=>{
+    readCharacterEditorIntoModel();
+    const check=validateBuild(character);
+    if(!check.valid) return toast(`Revise a ficha antes de gerar o PDF: ${check.errors[0]}`,'bad');
+    const snapshot=await withBusy(()=>api.exportCharacterJson(character.id));
+    snapshot.character={...snapshot.character,...structuredClone(character)};
+    downloadCharacterPdf(snapshot);
+    toast('PDF da ficha gerado.','good');
+  };
+
+  root.querySelector('#save-character').onclick = async () => {
+    readCharacterEditorIntoModel();
+
+    const check=validateBuild(character);
+    if(!check.valid) return toast(check.errors[0],'bad');
 
     const file = root.querySelector('#image-file').files?.[0];
     if (file) {
@@ -487,9 +563,6 @@ function renderCharacterEditor(character, isMasterEditor, root) {
       character.image_url=result.publicUrl;
       character.image_path=result.path;
     }
-
-    const check=validateBuild(character);
-    if(!check.valid) return toast(check.errors[0],'bad');
 
     if(isMasterEditor) {
       const saved=await withBusy(()=>api.masterSaveCharacter(character),'Entidade salva.');
@@ -530,7 +603,7 @@ function renderSystemPage() {
       <div class="card"><h2>Teste universal</h2><p><strong>1d20 + Modificador do Atributo + Nível da Perícia</strong></p><p class="muted">Modificador do atributo = valor do atributo dividido por 2, arredondado para baixo.</p></div>
       <div class="card"><h2>Defesa passiva</h2><p>A CA é o maior resultado entre Reflexos, Defender, Fortitude e Reforço.</p><p class="muted">Se um ataque superar a CA, o alvo ainda pode gastar PA para reagir quando possuir uma reação válida.</p></div>
       <div class="card"><h2>Crítico e Kokusen</h2><p>20 natural é crítico e pode ser elegível a Kokusen quando Energia Amaldiçoada estiver envolvida e o golpe realmente conectar.</p><p class="muted">Crítico forçado ou faixa de crítico ampliada não transforma outros resultados em Kokusen.</p></div>
-      <div class="card"><h2>Pontos de Ação</h2><p>PA são universais e podem ser gastos em ações, técnicas e reações. PA não usados permanecem até o início do próximo turno e então são redefinidos ao máximo.</p></div>
+      <div class="card"><h2>Pontos de Ação</h2><p>PA são universais e podem ser gastos em ações, técnicas e reações. No combate estruturado, voltam ao máximo no início do turno; no Combate Livre, o Mestre controla o reinício do ciclo.</p></div>
     </section>
     <div style="height:14px"></div>
     <section class="card"><h2>Equipamentos e Ferramentas Amaldiçoadas</h2>
@@ -540,7 +613,7 @@ function renderSystemPage() {
       <p><strong>Corpo:</strong> itens podem ocupar Cabeça, Pescoço, Corpo, Braços/Pulsos, Cintura, Pés ou um dos dois slots genéricos de Acessório. Um amuleto não precisa ocupar uma mão se puder ser vestido.</p>
       <p><strong>Segurar acessórios:</strong> quando a ficha do item permitir, um amuleto ou outro objeto pode ser ativado na Mão principal ou Mão secundária em vez de seu slot corporal. Isso ocupa fisicamente a mão.</p>
       <p><strong>Sintonia:</strong> cada item amaldiçoado aprovado e equipado consome 1 Sintonia, inclusive armas. Capacidade: 3 (Nv 1–24), 4 (25–49), 5 (50–74), 6 (75–99), 7 (100). Itens comuns e consumíveis não gastam Sintonia.</p>
-      <p><strong>VP:</strong> o ataque físico básico da arma não consome VP. Somente efeitos sobrenaturais usam o orçamento: Grau 4 = 2 VP, Grau 3 = 4 VP, Grau 2 = 6 VP, Grau 1 = 9 VP, Grau Especial = 12 VP base.</p>
+      <p><strong>VP:</strong> o ataque físico básico da arma não consome VP. Somente efeitos sobrenaturais usam o orçamento: Grau 4 = 2 VP, Grau 3 = 4 VP, Grau 2 = 6 VP, Grau 1 = 9 VP, Grau Especial = 12 VP.</p>
       <p><strong>Acerto:</strong> o Grau da ferramenta não fornece bônus automático. O ataque continua usando Atributo + Perícia.</p>
       <p><strong>Kokusen:</strong> uma arma amaldiçoada não torna o golpe elegível sozinha. É necessário conduzir Energia Amaldiçoada no ataque.</p>
       <p class="muted">Ferramentas amaldiçoadas propostas por jogadores ficam pendentes até aprovação do Mestre. Itens precisam estar equipados para seus passivos permanecerem ativos; consumíveis aprovados podem ser usados diretamente do inventário.</p>
@@ -563,6 +636,7 @@ async function renderAbilitiesPage() {
   const childAbilityPairs=await Promise.all(childSheets.map(async child=>({child,abilities:await api.getAbilities(child.id)})));
   const childAbilityMap=Object.fromEntries(childAbilityPairs.map(x=>[x.child.id,x.abilities]));
   const budget=slotBudget(state.character.level);
+  const hasApprovedManifestation=normalAbilities.some(a=>a.category==='manifestation'&&a.status==='approved');
   root.innerHTML=`
     ${pageHeader('Construção e aprovação', 'Habilidades')}
     <section class="grid grid-2">
@@ -598,7 +672,7 @@ async function renderAbilitiesPage() {
     <section class="card"><h2>Minhas habilidades</h2><div class="list">${normalAbilities.length?normalAbilities.map(a=>abilityCard(a)).join(''):'<p class="muted">Nenhuma habilidade enviada ainda.</p>'}</div></section>
     ${cursedBody?`<div style="height:14px"></div><section class="card cursed-body-zone"><div class="btn-row"><div><div class="eyebrow">CONCESSÃO DO MESTRE</div><h2 style="margin:4px 0">Técnica do Corpo · ${esc(cursedBody.name)}</h2></div><span class="pill good">LIBERADA</span></div><div class="body">${esc(cursedBody.description||'Esta Técnica do Corpo foi liberada pelo Mestre.')}</div><div class="notice" style="margin-top:10px">Técnicas e habilidades do Corpo Amaldiçoado são extras narrativos concedidos pelo Mestre. Elas não consomem os slots ou VP normais da sua build e não podem ser editadas pelo jogador.</div><h3 style="margin-top:14px">Habilidades do Corpo</h3><div class="list">${cursedBodyAbilities.length?cursedBodyAbilities.map(a=>abilityCard(a)).join(''):'<p class="muted">A Técnica do Corpo foi revelada, mas ainda não possui habilidades liberadas.</p>'}</div></section>`:''}
     <div style="height:14px"></div>
-    <section class="grid grid-2"><div class="card"><h2>Fichas filhas de invocação</h2><p class="muted">Uma ficha filha pode ser criada quando existe ao menos uma Manifestação aprovada.</p><form id="summon-form" class="field-row"><label>Nome da invocação<input name="name" required /></label><button class="btn primary" style="align-self:end">Criar ficha filha</button></form></div><div class="card"><h2>Invocações</h2><div class="list">${childSheets.length?childSheets.map(c=>`<button class="list-item" style="text-align:left;color:inherit;width:100%" data-select-summon="${c.id}"><div class="title">${esc(getName(c))}</div><div class="meta">Nv ${c.level}</div></button>`).join(''):'<p class="muted">Nenhuma ficha filha.</p>'}</div></div></section>
+    <section class="grid grid-2"><div class="card"><h2>Fichas filhas de invocação</h2><p class="muted">Uma ficha filha pode ser criada quando existe ao menos uma Manifestação aprovada.</p>${hasApprovedManifestation?'':'<div class="notice">A criação será liberada quando uma habilidade da categoria Manifestação / Invocação for aprovada pelo Mestre.</div>'}<form id="summon-form" class="field-row"><label>Nome da invocação<input name="name" required ${hasApprovedManifestation?'':'disabled'} /></label><button class="btn primary" style="align-self:end" ${hasApprovedManifestation?'':'disabled'}>Criar ficha filha</button></form></div><div class="card"><h2>Invocações</h2><div class="list">${childSheets.length?childSheets.map(c=>`<button class="list-item" style="text-align:left;color:inherit;width:100%" data-select-summon="${c.id}"><div class="title">${esc(getName(c))}</div><div class="meta">Nv ${c.level}</div></button>`).join(''):'<p class="muted">Nenhuma ficha filha.</p>'}</div></div></section>
     ${state.summonSelected?`<div style="height:14px"></div><section class="card"><div class="btn-row"><h2 style="margin:0">Habilidades de ${esc(getName(state.summonSelected))}</h2><span class="pill">Ficha filha</span></div><div class="notice" style="margin-top:8px">Estas habilidades pertencem à invocação e podem ser travadas no combate até a manifestação correspondente estar ativa.</div><div class="list" style="margin-top:10px">${(childAbilityMap[state.summonSelected.id]||[]).length?(childAbilityMap[state.summonSelected.id]||[]).map(a=>abilityCard(a)).join(''):'<p class="muted">Nenhuma habilidade cadastrada nesta ficha filha.</p>'}</div></section><div style="height:14px"></div><section id="summon-editor"></section>`:''}`;
 
   const form=root.querySelector('#ability-form');
@@ -669,57 +743,97 @@ async function renderHistoryPage() {
   root.innerHTML=`${pageHeader('Registro de alterações', 'Histórico')}<section class="card"><div class="list">${logs.length?logs.map(l=>`<div class="list-item"><div class="title">${esc(l.table_name)} • ${esc(l.action)}</div><div class="meta">${formatDate(l.created_at)}</div><div class="body">${esc(l.summary)}</div></div>`).join(''):'<p class="muted">Sem alterações registradas.</p>'}</div></section>`;
 }
 
+async function loadMasterQueues() {
+  const [tickets,vows,requests,pendingEquipment,pendingAbilities]=await Promise.all([
+    api.getTrainingTickets(),api.getVows(),api.getMasterRequests(),api.listPendingEquipment(),api.listPendingAbilities(),
+  ]);
+  return {tickets,vows,requests,pendingEquipment,pendingAbilities};
+}
+
+function masterGoBindings(root=document) {
+  root.querySelectorAll('[data-master-go]').forEach(btn=>btn.onclick=()=>{state.tab=btn.dataset.masterGo;renderShell();});
+}
+
 async function renderMasterPage() {
   const root=document.querySelector('#page');
   state.masterCharacters=await withBusy(()=>api.listAllCharacters());
-  const [tickets,vows,requests,pendingEquipment] = await Promise.all([api.getTrainingTickets(),api.getVows(),api.getMasterRequests(),api.listPendingEquipment()]);
-  const pendingAbilitiesResult=await supabase.from('abilities').select('*, characters(first_name,last_name)').eq('status','pending').order('created_at');
-  const pendingAbilities=pendingAbilitiesResult.data||[];
+  const queues=await loadMasterQueues();
+  const pendingTraining=queues.tickets.filter(t=>t.status==='pending').length;
+  const pendingVows=queues.vows.filter(v=>v.status==='pending').length;
+  const pendingRequests=queues.requests.filter(r=>r.status==='pending').length;
+  const totalPending=queues.pendingAbilities.length+queues.pendingEquipment.length+pendingTraining+pendingVows+pendingRequests;
   root.innerHTML=`
-    ${pageHeader('Administração', 'Mestre', `<span class="pill">${state.masterCharacters.length} entidades</span>`)}
-    <section class="master-zone">
+    ${pageHeader('Centro da mesa','Visão geral',`<span class="pill ${totalPending?'warn':'good'}">${totalPending} pendência(s)</span>`)}
+    <section class="master-zone master-dashboard">
       <div class="grid grid-2">
         <div class="card"><h2>Sessão</h2>${state.activeSession?`<p><span class="pill bad">Ativa</span> ${esc(state.activeSession.title||'Sessão')}</p><form id="end-session-form"><div class="list">${state.masterCharacters.filter(c=>c.entity_type==='player').map(c=>`<div class="list-item"><div class="title">${esc(getName(c))}</div><div class="field-row"><label>XP<input type="number" min="0" value="0" data-award-xp="${c.id}" /></label><label>Dias livres<input type="number" min="0" value="0" data-award-days="${c.id}" /></label></div></div>`).join('')}</div><button class="btn bad" style="margin-top:10px">Encerrar sessão</button></form>`:`<form id="start-session-form" class="grid"><label>Título<input name="title" placeholder="Sessão" /></label><button class="btn good">Iniciar sessão</button></form>`}</div>
-        <div class="card"><h2>Criar entidade</h2><form id="entity-form" class="grid"><div class="field-row"><label>Nome<input name="first" required /></label><label>Sobrenome<input name="last" /></label></div><div class="field-row-3"><label>Tipo<select name="type">${ENTITY_TYPES.filter(t=>t.key!=='player').map(t=>`<option value="${t.key}">${t.name}</option>`).join('')}</select></label><label>Nível<input name="level" type="number" min="1" max="100" value="5" /></label><label>Grau<select name="grade">${GRADE_OPTIONS.map(g=>`<option>${g}</option>`).join('')}</select></label></div><button class="btn primary">Criar e editar</button></form></div>
+        <div class="card"><h2>Fluxo do Mestre</h2><p class="muted">A administração foi separada por intenção: conduzir a mesa, editar fichas ou resolver pendências.</p><div class="master-quick-grid"><button class="master-quick-card" data-master-go="combat"><strong>Combate</strong><span>Executar a cena e o tabuleiro.</span></button><button class="master-quick-card" data-master-go="roster"><strong>Fichas</strong><span>Encontrar e editar entidades.</span></button><button class="master-quick-card" data-master-go="approvals"><strong>Aprovações</strong><span>${totalPending} item(ns) pedindo atenção.</span></button><button class="master-quick-card" data-master-go="tests"><strong>Testes</strong><span>Fazer rolagens livres por entidade.</span></button></div></div>
       </div>
     </section>
     <div style="height:14px"></div>
+    <section class="grid grid-4">
+      <button class="card master-metric" data-master-go="approvals"><span class="label">Habilidades</span><span class="value">${queues.pendingAbilities.length}</span></button>
+      <button class="card master-metric" data-master-go="approvals"><span class="label">Equipamentos</span><span class="value">${queues.pendingEquipment.length}</span></button>
+      <button class="card master-metric" data-master-go="approvals"><span class="label">Treinos / votos</span><span class="value">${pendingTraining+pendingVows}</span></button>
+      <button class="card master-metric" data-master-go="approvals"><span class="label">Notas</span><span class="value">${pendingRequests}</span></button>
+    </section>`;
+  root.querySelector('#start-session-form')?.addEventListener('submit',async e=>{e.preventDefault();const fd=new FormData(e.currentTarget);state.activeSession=await withBusy(()=>api.startSession(fd.get('title')),'Sessão iniciada.');try{await api.triggerBackup('session-start');toast('Backup do início da sessão enviado.','good');}catch(err){toast(`Sessão iniciou, mas o backup falhou: ${err.message}`,'warn');}renderMasterPage();});
+  root.querySelector('#end-session-form')?.addEventListener('submit',async e=>{e.preventDefault();const awards={};state.masterCharacters.filter(c=>c.entity_type==='player').forEach(c=>{awards[c.id]={xp:Number(root.querySelector(`[data-award-xp="${c.id}"]`).value||0),days:Number(root.querySelector(`[data-award-days="${c.id}"]`).value||0)};});await withBusy(()=>api.endSession(awards),'Sessão encerrada.');state.activeSession=null;try{await api.triggerBackup('session-end');toast('Backup do encerramento enviado.','good');}catch(err){toast(`Sessão encerrou, mas o backup falhou: ${err.message}`,'warn');}renderMasterPage();});
+  masterGoBindings(root);
+}
+
+async function renderMasterRosterPage() {
+  const root=document.querySelector('#page');
+  state.masterCharacters=await withBusy(()=>api.listAllCharacters());
+  root.innerHTML=`
+    ${pageHeader('Elenco e edição','Fichas',`<span class="pill">${state.masterCharacters.length} entidades</span>`)}
     <section class="grid grid-2">
-      <div class="card"><h2>Fichas por categoria</h2><div class="entity-groups">${masterEntityGroupsHtml(state.masterCharacters)}</div></div>
-      <div class="card"><h2>Fila de habilidades</h2><div class="list">${pendingAbilities.length?pendingAbilities.map(a=>`<div class="list-item"><div class="title">${esc(a.name)}</div><div class="meta">${esc(getName(a.characters))} • VP estimado ${a.vp_estimated}</div><div class="body">${esc(a.description)}\n${esc(a.mechanics)}</div><div class="field-row" style="margin-top:8px"><label>VP aprovado<input type="number" min="1" value="${a.vp_estimated}" data-vp-approved="${a.id}" /></label><label>Resposta<input data-ability-response="${a.id}" /></label></div><div class="btn-row" style="margin-top:8px"><button class="btn good" data-approve-ability="${a.id}">Aprovar</button><button class="btn bad" data-reject-ability="${a.id}">Rejeitar</button></div></div>`).join(''):'<p class="muted">Nada pendente.</p>'}</div></div>
+      <div class="card"><h2>Criar entidade</h2><form id="entity-form" class="grid"><div class="field-row"><label>Nome<input name="first" required /></label><label>Sobrenome<input name="last" /></label></div><div class="field-row-3"><label>Tipo<select name="type">${ENTITY_TYPES.filter(t=>t.key!=='player').map(t=>`<option value="${t.key}">${t.name}</option>`).join('')}</select></label><label>Nível<input name="level" type="number" min="1" max="100" value="5" /></label><label>Grau<select name="grade">${GRADE_OPTIONS.map(g=>`<option>${g}</option>`).join('')}</select></label></div><button class="btn primary">Criar e editar</button></form></div>
+      <div class="card"><h2>Localizar ficha</h2><label>Pesquisar por nome<input type="search" data-master-entity-search placeholder="Digite parte do nome..." autocomplete="off" /></label><p class="muted small">As categorias permanecem visíveis apenas quando possuem resultados.</p></div>
     </section>
     <div style="height:14px"></div>
-    <section class="card"><h2>Fila de equipamentos amaldiçoados</h2><div class="list">${pendingEquipmentQueueHtml(pendingEquipment,esc,getName)}</div></section>
-    <div style="height:14px"></div>
-    <section class="grid grid-2"><div class="card"><h2>Treinamentos pendentes</h2><div class="list">${tickets.filter(t=>t.status==='pending').map(t=>trainingCard(t,true)).join('')||'<p class="muted">Nada pendente.</p>'}</div></div><div class="card"><h2>Votos</h2><div class="list">${vows.map(v=>vowCard(v,true)).join('')||'<p class="muted">Nenhum voto.</p>'}</div></div></section>
-    <div style="height:14px"></div><section class="card"><h2>Notas ao mestre</h2><div class="list">${requests.filter(r=>r.status==='pending').map(r=>`<div class="list-item"><div class="title">${esc(r.title)}</div><div class="meta">${esc(getName(r.characters))}</div><div class="body">${esc(r.message)}</div><div class="field-row" style="margin-top:8px"><label>Resposta<input data-request-response="${r.id}" /></label><div class="btn-row" style="align-self:end"><button class="btn good" data-request-answer="${r.id}">Responder</button><button class="btn bad" data-request-reject="${r.id}">Rejeitar</button></div></div></div>`).join('')||'<p class="muted">Nada pendente.</p>'}</div></section>
-    <div style="height:14px"></div><section class="card"><h2>Condições do sistema</h2><div class="grid grid-2"><form id="condition-form" class="grid"><label>Chave técnica<input name="key" placeholder="ex: frozen" required /></label><label>Nome<input name="name" required /></label><label>Descrição<textarea name="description" required></textarea></label><button class="btn primary">Adicionar / atualizar</button></form><div class="list">${state.conditions.map(c=>`<div class="list-item"><div class="title">${esc(c.name)}</div><div class="body">${esc(c.description)}</div><button class="btn bad" data-condition-disable="${c.id}">Desativar</button></div>`).join('')}</div></div></section>
-    ${state.masterSelectedCharacter?`<div style="height:14px"></div><section id="master-editor"></section>`:''}
-  `;
-
-  root.querySelector('#start-session-form')?.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.currentTarget);state.activeSession=await withBusy(()=>api.startSession(f.get('title')),'Sessão iniciada.');try{await api.triggerBackup('session-start');toast('Backup do início da sessão enviado.','good');}catch(err){toast(`Sessão iniciou, mas o backup falhou: ${err.message}`,'warn');}renderMasterPage();});
-  root.querySelector('#end-session-form')?.addEventListener('submit',async e=>{e.preventDefault();const awards={};state.masterCharacters.filter(c=>c.entity_type==='player').forEach(c=>{awards[c.id]={xp:Number(root.querySelector(`[data-award-xp="${c.id}"]`).value||0),days:Number(root.querySelector(`[data-award-days="${c.id}"]`).value||0)};});await withBusy(()=>api.endSession(awards),'Sessão encerrada.');state.activeSession=null;try{await api.triggerBackup('session-end');toast('Backup do encerramento enviado.','good');}catch(err){toast(`Sessão encerrou, mas o backup falhou: ${err.message}`,'warn');}renderMasterPage();});
-  root.querySelector('#entity-form').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);const entity=await withBusy(()=>api.createMasterEntity({entityType:f.get('type'),firstName:f.get('first'),lastName:f.get('last'),level:Number(f.get('level')),grade:f.get('grade')}),'Entidade criada.');state.masterSelectedCharacter=entity;renderMasterPage();};
-  root.querySelectorAll('[data-select-entity]').forEach(btn=>btn.onclick=()=>{state.masterSelectedCharacter=structuredClone(state.masterCharacters.find(c=>c.id===btn.dataset.selectEntity));renderMasterPage();});
-  root.querySelectorAll('[data-training-approve]').forEach(btn=>btn.onclick=async()=>{await withBusy(()=>api.resolveTrainingTicket(btn.dataset.trainingApprove,'approved',''),'Treino aprovado.');renderMasterPage();});
-  root.querySelectorAll('[data-training-reject]').forEach(btn=>btn.onclick=async()=>{const response=prompt('Motivo/resposta ao jogador:')||'';await withBusy(()=>api.resolveTrainingTicket(btn.dataset.trainingReject,'rejected',response),'Treino rejeitado.');renderMasterPage();});
-  root.querySelectorAll('[data-master-vow]').forEach(btn=>btn.onclick=async()=>{await withBusy(()=>api.setVowStatus(btn.dataset.masterVow,btn.dataset.status),'Voto atualizado.');renderMasterPage();});
-  root.querySelectorAll('[data-approve-ability]').forEach(btn=>btn.onclick=async()=>{const id=btn.dataset.approveAbility;const vp=Number(root.querySelector(`[data-vp-approved="${id}"]`)?.value||1);const response=root.querySelector(`[data-ability-response="${id}"]`)?.value||'';const ability=pendingAbilities.find(a=>a.id===id);const {error}=await supabase.from('abilities').update({status:'approved',vp_approved:vp,master_response:response,limit_override:ability?.category==='domain'}).eq('id',id);if(error)return toast(error.message,'bad');toast('Habilidade aprovada.','good');renderMasterPage();});
-  root.querySelectorAll('[data-reject-ability]').forEach(btn=>btn.onclick=async()=>{const id=btn.dataset.rejectAbility;const response=root.querySelector(`[data-ability-response="${id}"]`)?.value||prompt('Resposta:')||'';const {error}=await supabase.from('abilities').update({status:'rejected',master_response:response}).eq('id',id);if(error)return toast(error.message,'bad');toast('Habilidade rejeitada.','good');renderMasterPage();});
-  bindPendingEquipmentQueue(root,pendingEquipment,combatContext(root),renderMasterPage);
-  root.querySelector('#condition-form').insertAdjacentHTML('afterbegin','<div class="notice">O catálogo público usa estados genéricos estáveis. Novas condições cadastradas aqui ficam restritas ao Mestre. Para um efeito específico em jogo, use Efeito Improvisado no combate.</div>');
-  root.querySelector('#condition-form').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);await withBusy(()=>api.upsertSystemCondition({key:String(f.get('key')).trim(),name:String(f.get('name')).trim(),description:String(f.get('description')).trim(),active:true}),'Condição salva.');state.conditions=await api.getSystemConditions();renderMasterPage();};
-  root.querySelectorAll('[data-condition-disable]').forEach(btn=>btn.onclick=async()=>{await withBusy(()=>api.deactivateSystemCondition(btn.dataset.conditionDisable),'Condição desativada.');state.conditions=await api.getSystemConditions();renderMasterPage();});
-  root.querySelectorAll('[data-request-answer]').forEach(btn=>btn.onclick=async()=>{const id=btn.dataset.requestAnswer;const response=root.querySelector(`[data-request-response="${id}"]`)?.value||'';await withBusy(()=>api.resolveMasterRequest(id,'answered',response),'Solicitação respondida.');renderMasterPage();});
-  root.querySelectorAll('[data-request-reject]').forEach(btn=>btn.onclick=async()=>{const id=btn.dataset.requestReject;const response=root.querySelector(`[data-request-response="${id}"]`)?.value||'';await withBusy(()=>api.resolveMasterRequest(id,'rejected',response),'Solicitação rejeitada.');renderMasterPage();});
-  bindConditionLinks(root);
-
-  if(state.masterSelectedCharacter) {
+    <section class="card"><h2>Fichas por categoria</h2><div class="entity-groups">${masterEntityGroupsHtml(state.masterCharacters)}</div></section>
+    ${state.masterSelectedCharacter?`<div style="height:14px"></div><section id="master-editor"></section>`:''}`;
+  root.querySelector('#entity-form').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.currentTarget);const entity=await withBusy(()=>api.createMasterEntity({entityType:fd.get('type'),firstName:fd.get('first'),lastName:fd.get('last'),level:Number(fd.get('level')),grade:fd.get('grade')}),'Entidade criada.');state.masterSelectedCharacter=entity;renderMasterRosterPage();};
+  root.querySelectorAll('[data-select-entity]').forEach(btn=>btn.onclick=()=>{state.masterSelectedCharacter=structuredClone(state.masterCharacters.find(c=>c.id===btn.dataset.selectEntity));renderMasterRosterPage();});
+  const search=root.querySelector('[data-master-entity-search]');
+  search?.addEventListener('input',()=>{
+    const q=normalizeUiSearch(search.value);
+    root.querySelectorAll('[data-master-entity-card]').forEach(card=>{card.hidden=Boolean(q&&!String(card.dataset.searchName||'').includes(q));});
+    root.querySelectorAll('[data-master-entity-group]').forEach(group=>{group.hidden=![...group.querySelectorAll('[data-master-entity-card]')].some(card=>!card.hidden);});
+  });
+  if(state.masterSelectedCharacter){
     const editor=root.querySelector('#master-editor');
     editor.innerHTML='<div class="master-zone"><div id="master-char-editor"></div><div id="master-secret"></div></div>';
     renderCharacterEditor(state.masterSelectedCharacter,true,editor.querySelector('#master-char-editor'));
     renderMasterSecret(editor.querySelector('#master-secret'),state.masterSelectedCharacter);
   }
+}
+
+async function renderMasterApprovalsPage() {
+  const root=document.querySelector('#page');
+  const {tickets,vows,requests,pendingEquipment,pendingAbilities}=await loadMasterQueues();
+  const pendingTickets=tickets.filter(t=>t.status==='pending');
+  const pendingRequests=requests.filter(r=>r.status==='pending');
+  root.innerHTML=`
+    ${pageHeader('Revisão e administração','Aprovações')}
+    <section class="approval-section card"><div class="section-head"><h2>Habilidades</h2><span class="pill">${pendingAbilities.length}</span></div><div class="list">${pendingAbilities.length?pendingAbilities.map(a=>`<div class="list-item"><div class="title">${esc(a.name)}</div><div class="meta">${esc(getName(a.characters))} • VP estimado ${a.vp_estimated}</div><div class="body">${esc(a.description)}\n${esc(a.mechanics)}</div><div class="field-row" style="margin-top:8px"><label>VP aprovado<input type="number" min="1" value="${a.vp_estimated}" data-vp-approved="${a.id}" /></label><label>Resposta<input data-ability-response="${a.id}" /></label></div><div class="btn-row" style="margin-top:8px"><button class="btn good" data-approve-ability="${a.id}">Aprovar</button><button class="btn bad" data-reject-ability="${a.id}">Rejeitar</button></div></div>`).join(''):'<p class="muted">Nada pendente.</p>'}</div></section>
+    <div style="height:14px"></div><section class="approval-section card"><div class="section-head"><h2>Equipamentos amaldiçoados</h2><span class="pill">${pendingEquipment.length}</span></div><div class="list">${pendingEquipmentQueueHtml(pendingEquipment,esc,getName)}</div></section>
+    <div style="height:14px"></div><section class="grid grid-2"><div class="approval-section card"><div class="section-head"><h2>Treinamentos</h2><span class="pill">${pendingTickets.length}</span></div><div class="list">${pendingTickets.map(t=>trainingCard(t,true)).join('')||'<p class="muted">Nada pendente.</p>'}</div></div><div class="approval-section card"><h2>Votos</h2><div class="list">${vows.map(v=>vowCard(v,true)).join('')||'<p class="muted">Nenhum voto.</p>'}</div></div></section>
+    <div style="height:14px"></div><section class="approval-section card"><div class="section-head"><h2>Notas ao Mestre</h2><span class="pill">${pendingRequests.length}</span></div><div class="list">${pendingRequests.map(r=>`<div class="list-item"><div class="title">${esc(r.title)}</div><div class="meta">${esc(getName(r.characters))}</div><div class="body">${esc(r.message)}</div><div class="field-row" style="margin-top:8px"><label>Resposta<input data-request-response="${r.id}" /></label><div class="btn-row" style="align-self:end"><button class="btn good" data-request-answer="${r.id}">Responder</button><button class="btn bad" data-request-reject="${r.id}">Rejeitar</button></div></div></div>`).join('')||'<p class="muted">Nada pendente.</p>'}</div></section>
+    <div style="height:14px"></div><section class="approval-section card"><h2>Condições do sistema</h2><div class="grid grid-2"><form id="condition-form" class="grid"><div class="notice">O catálogo público usa estados genéricos estáveis. Para um efeito específico em jogo, prefira Efeito Improvisado no combate.</div><label>Chave técnica<input name="key" placeholder="ex: frozen" required /></label><label>Nome<input name="name" required /></label><label>Descrição<textarea name="description" required></textarea></label><button class="btn primary">Adicionar / atualizar</button></form><div class="list">${state.conditions.map(cond=>`<div class="list-item"><div class="title">${esc(cond.name)}</div><div class="body">${esc(cond.description)}</div><button class="btn bad" data-condition-disable="${cond.id}">Desativar</button></div>`).join('')}</div></div></section>`;
+
+  root.querySelectorAll('[data-training-approve]').forEach(btn=>btn.onclick=async()=>{await withBusy(()=>api.resolveTrainingTicket(btn.dataset.trainingApprove,'approved',''),'Treino aprovado.');renderMasterApprovalsPage();});
+  root.querySelectorAll('[data-training-reject]').forEach(btn=>btn.onclick=async()=>{const response=prompt('Motivo/resposta ao jogador:')||'';await withBusy(()=>api.resolveTrainingTicket(btn.dataset.trainingReject,'rejected',response),'Treino rejeitado.');renderMasterApprovalsPage();});
+  root.querySelectorAll('[data-master-vow]').forEach(btn=>btn.onclick=async()=>{await withBusy(()=>api.setVowStatus(btn.dataset.masterVow,btn.dataset.status),'Voto atualizado.');renderMasterApprovalsPage();});
+  root.querySelectorAll('[data-approve-ability]').forEach(btn=>btn.onclick=async()=>{const id=btn.dataset.approveAbility;const ability=pendingAbilities.find(a=>a.id===id);const vp=Number(root.querySelector(`[data-vp-approved="${id}"]`)?.value||1);const response=root.querySelector(`[data-ability-response="${id}"]`)?.value||'';await withBusy(()=>api.reviewAbility(id,{status:'approved',vpApproved:vp,masterResponse:response,limitOverride:ability?.category==='domain'}),'Habilidade aprovada.');renderMasterApprovalsPage();});
+  root.querySelectorAll('[data-reject-ability]').forEach(btn=>btn.onclick=async()=>{const id=btn.dataset.rejectAbility;const response=root.querySelector(`[data-ability-response="${id}"]`)?.value||prompt('Resposta:')||'';await withBusy(()=>api.reviewAbility(id,{status:'rejected',masterResponse:response}),'Habilidade rejeitada.');renderMasterApprovalsPage();});
+  bindPendingEquipmentQueue(root,pendingEquipment,combatContext(root),renderMasterApprovalsPage);
+  root.querySelector('#condition-form').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.currentTarget);await withBusy(()=>api.upsertSystemCondition({key:String(fd.get('key')).trim(),name:String(fd.get('name')).trim(),description:String(fd.get('description')).trim(),active:true}),'Condição salva.');state.conditions=await api.getSystemConditions();renderMasterApprovalsPage();};
+  root.querySelectorAll('[data-condition-disable]').forEach(btn=>btn.onclick=async()=>{await withBusy(()=>api.deactivateSystemCondition(btn.dataset.conditionDisable),'Condição desativada.');state.conditions=await api.getSystemConditions();renderMasterApprovalsPage();});
+  root.querySelectorAll('[data-request-answer]').forEach(btn=>btn.onclick=async()=>{const id=btn.dataset.requestAnswer;const response=root.querySelector(`[data-request-response="${id}"]`)?.value||'';await withBusy(()=>api.resolveMasterRequest(id,'answered',response),'Solicitação respondida.');renderMasterApprovalsPage();});
+  root.querySelectorAll('[data-request-reject]').forEach(btn=>btn.onclick=async()=>{const id=btn.dataset.requestReject;const response=root.querySelector(`[data-request-response="${id}"]`)?.value||'';await withBusy(()=>api.resolveMasterRequest(id,'rejected',response),'Solicitação rejeitada.');renderMasterApprovalsPage();});
+  bindConditionLinks(root);
 }
 
 async function renderMasterSecret(root,character){
@@ -872,6 +986,7 @@ function subscribeCombatRealtime(encounterId, rerender) {
     // Participantes, ações e efeitos sinalizam mudanças pelo encontro. O player
     // refaz as projeções seguras sem receber arrays privados pela assinatura.
     .on('postgres_changes', { event: '*', schema: 'public', table: 'roll_logs', filter: `encounter_id=eq.${encounterId}` }, refresh)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'combat_participants', filter: `encounter_id=eq.${encounterId}` }, refresh)
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'combat_encounters', filter: `id=eq.${encounterId}` }, refresh)
     .subscribe();
 }

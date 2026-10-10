@@ -121,6 +121,31 @@ export async function createAbility(payload) {
   return data;
 }
 
+export async function listPendingAbilities() {
+  const { data, error } = await supabase
+    .from('abilities')
+    .select('*, characters(first_name,last_name)')
+    .eq('status', 'pending')
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function reviewAbility(id, { status, vpApproved = null, masterResponse = '', limitOverride = false } = {}) {
+  if (!['approved', 'rejected'].includes(status)) throw new Error('Estado de revisão de habilidade inválido.');
+  const patch = {
+    status,
+    master_response: String(masterResponse || ''),
+  };
+  if (status === 'approved') {
+    patch.vp_approved = Math.max(1, Number(vpApproved) || 1);
+    patch.limit_override = Boolean(limitOverride);
+  }
+  const { data, error } = await supabase.from('abilities').update(patch).eq('id', id).select('*').single();
+  if (error) throw error;
+  return data;
+}
+
 
 // ============================================================
 // TÉCNICA DO CORPO AMALDIÇOADO (concessão exclusiva do Mestre)
@@ -319,9 +344,13 @@ export async function getAuditLogs(characterId = null) {
 }
 
 export async function uploadCharacterImage(userId, characterId, file) {
-  const extension = file.name.split('.').pop() || 'png';
+  const allowed = new Set(['image/png','image/jpeg','image/webp','image/gif']);
+  if (!file || !allowed.has(file.type)) throw new Error('Use uma imagem PNG, JPEG, WebP ou GIF.');
+  if (Number(file.size || 0) > 8 * 1024 * 1024) throw new Error('A imagem deve ter no máximo 8 MB.');
+  const extensionByType = { 'image/png':'png', 'image/jpeg':'jpg', 'image/webp':'webp', 'image/gif':'gif' };
+  const extension = extensionByType[file.type] || 'png';
   const path = `${userId}/${characterId}/${crypto.randomUUID()}.${extension}`;
-  const { error } = await supabase.storage.from('character-images').upload(path, file, { upsert: false });
+  const { error } = await supabase.storage.from('character-images').upload(path, file, { upsert: false, contentType: file.type });
   if (error) throw error;
   const { data } = supabase.storage.from('character-images').getPublicUrl(path);
   return { path, publicUrl: data.publicUrl };
@@ -388,7 +417,11 @@ export async function listMasterProgress(characterId = null) {
 }
 
 export async function upsertMasterProgress(payload) {
-  const { data, error } = await supabase.from('master_progress_tracks').upsert(payload).select('*').single();
+  const { data, error } = await supabase
+    .from('master_progress_tracks')
+    .upsert(payload, { onConflict: 'character_id,key' })
+    .select('*')
+    .single();
   if (error) throw error;
   return data;
 }

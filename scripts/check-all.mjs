@@ -6,6 +6,7 @@ const checks = [
   ['check-tactical-board.mjs'], ['check-antonio.mjs'],
   ['sync-condition-catalog.mjs','--check'], ['check-improvised-combat.mjs'], ['check-improvised-ui.mjs'],
   ['check-effect-coverage.mjs'], ['check-table-control.mjs'],
+  ['check-character-pdf.mjs'], ['check-ux-audit.mjs'],
 ];
 let failures=0;
 for (const [script,...args] of checks) {

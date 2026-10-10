@@ -9,7 +9,7 @@
  * - Não expor sistemas narrativamente secretos em telas de jogador apenas por estarem implementados no banco.
  */
 
-export const SYSTEM_VERSION = '0.8.3';
+export const SYSTEM_VERSION = '0.8.7';
 
 export const ATTRIBUTES = [
   {
@@ -56,9 +56,9 @@ export const ATTRIBUTES = [
   },
   {
     key: 'cursed_control',
-    name: 'Conhecimento Amaldiçoado',
+    name: 'Controle Amaldiçoado',
     description:
-      'Conhecimento e domínio prático dos princípios da Energia Amaldiçoada, incluindo sua condução, aplicação e manipulação. Não representa o tamanho da reserva.',
+      'Precisão e domínio sobre a própria Energia Amaldiçoada; não mede o tamanho da reserva.',
   },
 ];
 
@@ -68,7 +68,7 @@ export const SKILLS = [
   ['fight', 'Lutar', 'strength', 'Treinamento e eficiência em combate corpo a corpo, desarmado ou utilizando armas de combate próximo.'],
   ['grapple', 'Agarrar', 'strength', 'Capacidade de prender, conter ou controlar fisicamente outro corpo e de disputar agarrões.'],
   ['impact', 'Impacto', 'strength', 'Capacidade de aplicar força de maneira concentrada para quebrar, empurrar, deslocar ou afetar fisicamente objetos e estruturas.'],
-  ['defend', 'Defesa', 'strength', 'Capacidade de bloquear, aparar ou interceptar fisicamente ataques utilizando força, postura, corpo, arma ou meio apropriado.'],
+  ['defend', 'Defender', 'strength', 'Capacidade de bloquear, aparar ou interceptar fisicamente ataques utilizando força, postura, corpo, arma ou meio apropriado.'],
 
   // Destreza
   ['acrobatics', 'Acrobacia', 'dexterity', 'Controle corporal durante movimentos complexos, equilíbrio, aterrissagens e reposicionamentos físicos.'],
@@ -421,33 +421,44 @@ export function sumObjectValues(object) {
 }
 
 export function validateBuild(character) {
-  const level = clamp(character.level, 1, 100);
+  const rawLevel = Number(character?.level);
   const errors = [];
-  const attrs = character.attributes || {};
-  const skills = character.skills || {};
+  if (!Number.isInteger(rawLevel) || rawLevel < 1 || rawLevel > 100) {
+    errors.push('Nível deve ser um número inteiro entre 1 e 100.');
+  }
+  const level = clamp(rawLevel, 1, 100);
+  const attrs = character?.attributes || {};
+  const skills = character?.skills || {};
   const attrCapValue = attributeCap(level);
   const skillCapValue = skillCap(level);
 
-  const attrSum = ATTRIBUTES.reduce((sum, attr) => sum + Number(attrs[attr.key] || 0), 0);
-  const skillSum = SKILLS.reduce((sum, skill) => sum + Number(skills[skill.key] || 0), 0);
-
+  const attrValues = ATTRIBUTES.map(attr => [attr, Number(attrs[attr.key])]);
+  for (const [attr, value] of attrValues) {
+    if (!Number.isInteger(value) || value < 1 || value > attrCapValue) {
+      errors.push(`${attr.name} deve ser um número inteiro entre 1 e ${attrCapValue}.`);
+    }
+  }
+  const attrSum = attrValues.reduce((sum, [, value]) => sum + (Number.isFinite(value) ? value : 0), 0);
   if (attrSum > attributePointBudget(level)) {
     errors.push(`Atributos excedem o limite: ${attrSum}/${attributePointBudget(level)} pontos.`);
   }
-  for (const attr of ATTRIBUTES) {
-    const value = Number(attrs[attr.key] || 0);
-    if (value < 1 || value > attrCapValue) errors.push(`${attr.name} deve ficar entre 1 e ${attrCapValue}.`);
-  }
 
+  const skillValues = SKILLS.map(skill => [skill, Number(skills[skill.key] ?? 0)]);
+  for (const [skill, value] of skillValues) {
+    if (!Number.isInteger(value) || value < 0 || value > skillCapValue) {
+      errors.push(`${skill.name} deve ser um número inteiro entre 0 e ${skillCapValue}.`);
+    }
+  }
+  const skillSum = skillValues.reduce((sum, [, value]) => sum + (Number.isFinite(value) ? value : 0), 0);
   if (skillSum > skillPointBudget(level)) {
     errors.push(`Perícias excedem o limite: ${skillSum}/${skillPointBudget(level)} pontos.`);
   }
-  for (const skill of SKILLS) {
-    const value = Number(skills[skill.key] || 0);
-    if (value < 0 || value > skillCapValue) errors.push(`${skill.name} deve ficar entre 0 e ${skillCapValue}.`);
-  }
 
-  const growth = Number(character.growth_vigor || 0) + Number(character.growth_reserve || 0);
+  const vigor = Number(character?.growth_vigor ?? 0);
+  const reserve = Number(character?.growth_reserve ?? 0);
+  if (!Number.isInteger(vigor) || vigor < 0) errors.push('Vigor deve ser um número inteiro igual ou maior que 0.');
+  if (!Number.isInteger(reserve) || reserve < 0) errors.push('Reserva deve ser um número inteiro igual ou maior que 0.');
+  const growth = (Number.isFinite(vigor) ? vigor : 0) + (Number.isFinite(reserve) ? reserve : 0);
   if (growth > growthPointBudget(level)) {
     errors.push(`Crescimento excede o limite: ${growth}/${growthPointBudget(level)} pontos entre Vigor e Reserva.`);
   }
@@ -572,7 +583,8 @@ export function estimateAbilityVP(config = {}) {
   vp += VP_OPTIONS.duration[config.duration]?.vp || 0;
   vp += VP_OPTIONS.conditionSeverity[config.condition_severity]?.vp || 0;
 
-  if (config.no_attack_or_save) vp += 2;
+  const reliableWithoutOpposition = Boolean(config.no_attack_or_save) || ((Number(config.damage_dice_count || 0) > 0 || Boolean(config.condition_key)) && config.requires_attack === false);
+  if (reliableWithoutOpposition) vp += 2;
   if (config.mobility) vp += 1;
   if (config.healing || (Number(config.healing_dice_count || 0) > 0 && Number(config.healing_die || 0) > 0)) vp += 2;
   if (config.damage_reduction) vp += 1;
@@ -606,11 +618,9 @@ export function estimateAbilityVP(config = {}) {
   // Configurações de execução também alteram o orçamento. Um efeito ofensivo sem
   // teste para acertar é mais confiável; crítico forçado e margem ampliada são
   // benefícios relevantes, mas não tornam o golpe elegível a Kokusen.
-  const hasOffensivePayload = Number(config.damage_dice_count || 0) > 0 || Boolean(config.condition_key);
-  if (hasOffensivePayload && config.requires_attack === false) vp += 2;
   if (config.forced_critical) vp += 2;
   const threshold = clamp(config.critical_threshold || 20, 2, 20);
-  if (threshold < 20) vp += Math.ceil((20 - threshold) / 2);
+  if (!config.forced_critical && threshold < 20) vp += Math.ceil((20 - threshold) / 2);
 
   return Math.max(1, Math.round(vp));
 }

@@ -15,6 +15,7 @@ import {
   equipmentAttunementCapacity,
   SKILL_BY_KEY,
   ATTRIBUTE_BY_KEY,
+  estimateAbilityVP,
 } from '../src/lib/system.js';
 
 for (const level of [1,5,25,50,75,100]) {
@@ -41,11 +42,11 @@ for (const level of [1,5,25,50,75,100]) {
 
 // Mapeamento defensivo canônico.
 if (SKILL_BY_KEY.defend?.attribute !== 'strength') throw new Error('Defesa precisa pertencer a Força.');
-if (SKILL_BY_KEY.defend?.name !== 'Defesa') throw new Error('A perícia defend precisa ser exibida como Defesa.');
+if (SKILL_BY_KEY.defend?.name !== 'Defender') throw new Error('A perícia defend precisa ser exibida como Defender.');
 if (SKILL_BY_KEY.reflexes?.attribute !== 'dexterity') throw new Error('Reflexos precisa pertencer a Destreza.');
 if (SKILL_BY_KEY.fortitude?.attribute !== 'resistance') throw new Error('Fortitude precisa pertencer a Resistência.');
 if (SKILL_BY_KEY.reinforcement?.attribute !== 'cursed_control') throw new Error('Reforço precisa pertencer a Conhecimento Amaldiçoado.');
-if (ATTRIBUTE_BY_KEY.cursed_control?.name !== 'Conhecimento Amaldiçoado') throw new Error('cursed_control precisa ser exibido como Conhecimento Amaldiçoado.');
+if (ATTRIBUTE_BY_KEY.cursed_control?.name !== 'Controle Amaldiçoado') throw new Error('cursed_control precisa ser exibido como Controle Amaldiçoado.');
 
 const defenseProbe = {
   level: 5,
@@ -95,4 +96,29 @@ for (const [level,expected] of Object.entries(attunementExpected)) {
   if (equipmentAttunementCapacity(Number(level))!==expected) throw new Error(`Sintonia incorreta no nível ${level}`);
 }
 
-console.log('OK: fórmulas básicas, novo mapeamento defensivo, dano de armas, Sintonia, equipamentos e distribuições neutras válidas.');
+
+const invalidGrowth = {
+  level:5,
+  ...createBalancedBuild(5),
+  permanent_ps_bonus:0,
+  permanent_ea_bonus:0,
+};
+invalidGrowth.growth_vigor=-1;
+if (validateBuild(invalidGrowth).valid) throw new Error('Vigor negativo não pode formar uma build válida.');
+const fractionalSkill = {
+  level:5,
+  ...createBalancedBuild(5),
+  permanent_ps_bonus:0,
+  permanent_ea_bonus:0,
+};
+fractionalSkill.skills={...fractionalSkill.skills, fight:1.5};
+if (validateBuild(fractionalSkill).valid) throw new Error('Perícia fracionária não pode formar uma build válida.');
+
+const reliable={damage_dice_count:2,damage_die:6,condition_key:null,requires_attack:false,no_attack_or_save:true,critical_threshold:20};
+const onlyFlag={...reliable,requires_attack:true};
+if (estimateAbilityVP(reliable)!==estimateAbilityVP(onlyFlag)) throw new Error('VP não deve cobrar duas vezes a mesma confiabilidade sem ataque/resistência.');
+const forced={damage_dice_count:1,damage_die:8,requires_attack:true,forced_critical:true,critical_threshold:18};
+const forced20={...forced,critical_threshold:20};
+if (estimateAbilityVP(forced)!==estimateAbilityVP(forced20)) throw new Error('Crítico forçado não deve acumular custo de faixa ampliada que se tornou irrelevante.');
+
+console.log('OK: fórmulas básicas, validação estrita, VP sem dupla cobrança, mapeamento defensivo, dano de armas, Sintonia e equipamentos.');

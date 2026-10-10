@@ -21,23 +21,39 @@ function d20Formula(mode='normal', count=1) {
   return '1d20';
 }
 
+function showModalError(overlay,message='Valor inválido.') {
+  let box=overlay.querySelector('[data-md-error]');
+  if(!box){
+    box=document.createElement('div');
+    box.className='notice bad manual-dice-error';
+    box.dataset.mdError='1';
+    box.setAttribute('role','alert');
+    overlay.querySelector('.manual-dice-modal')?.appendChild(box);
+  }
+  box.textContent=String(message||'Valor inválido.');
+  box.scrollIntoView?.({block:'nearest'});
+}
+
 function modal({title,body,ready}) {
   return new Promise(resolve=>{
+    const previous=document.activeElement;
     const overlay=document.createElement('div');
     overlay.className='overlay manual-dice-overlay';
-    overlay.innerHTML=`<div class="modal manual-dice-modal">
+    overlay.innerHTML=`<div class="modal manual-dice-modal" role="dialog" aria-modal="true" aria-labelledby="manual-dice-title">
       <div class="btn-row" style="justify-content:space-between">
-        <h2 style="margin:0">${esc(title)}</h2>
+        <h2 id="manual-dice-title" style="margin:0">${esc(title)}</h2>
         <button class="btn" type="button" data-md-cancel>Cancelar</button>
       </div>
       ${body}
     </div>`;
     document.body.appendChild(overlay);
     let finished=false;
-    const finish=value=>{if(finished)return;finished=true;overlay.remove();resolve(value);};
+    const finish=value=>{if(finished)return;finished=true;overlay.remove();previous?.focus?.();resolve(value);};
     overlay.querySelector('[data-md-cancel]').onclick=()=>finish(null);
     overlay.onclick=e=>{if(e.target===overlay)finish(null);};
+    overlay.onkeydown=e=>{if(e.key==='Escape')finish(null);};
     ready?.(overlay,finish);
+    overlay.querySelector('[data-md-digital], [data-md-cancel]')?.focus();
   });
 }
 
@@ -145,7 +161,7 @@ export async function chooseD20RollSet({title='Rolagem',specs=[],details=''}) {
       const area=overlay.querySelector('[data-md-area]');
       area.style.display='';
       area.innerHTML=`<form data-md-form><div class="list">${d20Fields(clean)}</div><button class="btn good" style="margin-top:10px">Confirmar dados físicos</button></form>`;
-      area.querySelector('[data-md-form]').onsubmit=e=>{e.preventDefault();try{finish({source:'physical',tokens:collectD20(overlay,clean)});}catch(err){alert(err.message);}};
+      area.querySelector('[data-md-form]').onsubmit=e=>{e.preventDefault();try{finish({source:'physical',tokens:collectD20(overlay,clean)});}catch(err){showModalError(overlay,err.message);}};
     };
   }});
 }
@@ -165,7 +181,7 @@ export async function chooseDiceRoll({title='Rolagem',groups=[],details=''}) {
       area.style.display='';
       area.innerHTML=`<form data-md-form><div class="list">${diceGroupFields(clean)}</div><button class="btn good" style="margin-top:10px">Confirmar dados físicos</button></form>`;
       bindGroupModes(overlay,clean);
-      area.querySelector('[data-md-form]').onsubmit=e=>{e.preventDefault();try{finish({source:'physical',tokens:collectGroups(overlay,clean)});}catch(err){alert(err.message);}};
+      area.querySelector('[data-md-form]').onsubmit=e=>{e.preventDefault();try{finish({source:'physical',tokens:collectGroups(overlay,clean)});}catch(err){showModalError(overlay,err.message);}};
     };
   }});
 }
@@ -175,7 +191,7 @@ export async function enterPhysicalDiceGroups({title='Dados físicos',groups=[]}
   if(!clean.length) return [];
   return modal({title,body:`<div class="notice" style="margin:12px 0">Role ${clean.map(g=>`${g.count}d${g.sides}`).join(' + ')}. Informe somente os dados; os modificadores continuam automáticos.</div><form data-md-form><div class="list">${diceGroupFields(clean)}</div><button class="btn good" style="margin-top:10px">Registrar dados físicos</button></form>`,ready:(overlay,finish)=>{
     bindGroupModes(overlay,clean);
-    overlay.querySelector('[data-md-form]').onsubmit=e=>{e.preventDefault();try{finish(collectGroups(overlay,clean));}catch(err){alert(err.message);}};
+    overlay.querySelector('[data-md-form]').onsubmit=e=>{e.preventDefault();try{finish(collectGroups(overlay,clean));}catch(err){showModalError(overlay,err.message);}};
   }});
 }
 
@@ -236,7 +252,7 @@ export async function chooseResolutionRoll({actionId,title='Reduções e resist�
       area.querySelector('[data-md-form]').onsubmit=e=>{
         e.preventDefault();
         try{finish({source:'physical',tokens:[...collectGroups(overlay,diceGroups),...collectD20(overlay,d20Specs)]});}
-        catch(err){alert(err.message);}
+        catch(err){showModalError(overlay,err.message);}
       };
     };
   }});
@@ -338,7 +354,7 @@ export async function chooseBombRoll({title,effect}) {
       area.style.display='';
       area.innerHTML=`<form data-md-form><div class="list">${diceGroupFields(damageGroups)}${d20Fields(defenseSpecs)}</div><button class="btn good" style="margin-top:10px">Confirmar dados físicos</button></form>`;
       bindGroupModes(overlay,damageGroups);
-      area.querySelector('[data-md-form]').onsubmit=e=>{e.preventDefault();try{finish({source:'physical',tokens:[...collectGroups(overlay,damageGroups),...collectD20(overlay,defenseSpecs)]});}catch(err){alert(err.message);}};
+      area.querySelector('[data-md-form]').onsubmit=e=>{e.preventDefault();try{finish({source:'physical',tokens:[...collectGroups(overlay,damageGroups),...collectD20(overlay,defenseSpecs)]});}catch(err){showModalError(overlay,err.message);}};
     };
   }});
 }

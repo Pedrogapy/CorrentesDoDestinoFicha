@@ -36,9 +36,9 @@ export function combatLivePanelHtml({actions=[],effects=[],activeName='',master=
   const latest=ordered[0]||null;
   const recent=ordered.slice(1,6);
   const masterEffects=master ? (effects||[]).slice(0,10) : [];
-  const open = globalThis?.localStorage?.getItem('correntes-combat-live-open') !== '0';
-  return `<button type="button" class="combat-live-fab" data-combat-live-toggle aria-expanded="${open?'true':'false'}">⚔ Agora</button>
-  <aside class="combat-live-panel ${open?'is-open':''}" data-combat-live-panel aria-hidden="${open?'false':'true'}">
+  const open = globalThis?.localStorage?.getItem('correntes-combat-live-open') === '1';
+  return `<button type="button" class="combat-live-fab" data-combat-live-toggle aria-expanded="${open?'true':'false'}">Agora</button>
+  <aside class="combat-live-panel ${open?'is-open':''}" data-combat-live-panel aria-hidden="${open?'false':'true'}" aria-label="Ações disponíveis agora">
     <div class="combat-live-head"><div><div class="combat-live-eyebrow">AGORA NO COMBATE</div><strong>${esc(activeName||'Aguardando o Mestre')}</strong></div><button class="btn ghost" type="button" data-combat-live-close>Ocultar</button></div>
     <div class="combat-live-reaction ${reactionsEnabled?'allowed':'blocked'}">Reações: <strong>${reactionsEnabled?'liberadas':'bloqueadas pelo Mestre'}</strong></div>
     <section class="combat-live-available">
@@ -282,6 +282,7 @@ export function bindCombatLivePanel(root=document, options={}) {
   };
   toggle.onclick=()=>setOpen(!panel.classList.contains('is-open'));
   close?.addEventListener('click',()=>setOpen(false));
+  if(options.phase==='reaction') setOpen(true);
   if(options.role==='master'){
     const relevantActor=String(options.phase==='reaction'?(options.pendingActorId||''):(options.actorId||''));
     const reactionInput=[...root.querySelectorAll('[data-creactions][data-combat-actor]')]
