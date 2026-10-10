@@ -998,13 +998,32 @@ select[multiple]{
 .combat-history > .list { padding:0 16px 16px; }
 
 .manual-dice-error { margin-top:12px; }
+button:focus-visible, summary:focus-visible, a:focus-visible {
+  outline: 3px solid #f3c66f;
+  outline-offset: 3px;
+}
+.nav-section-label { color: #aaa8b4; }
+.sheet-hero { overflow: hidden; }
+.content, .card, .field-row > *, .field-row-3 > * { min-width: 0; }
+.page-title h1, .list-item .title { overflow-wrap: anywhere; }
+.character-sheet-page .page-title .kicker { color: color-mix(in srgb,var(--sheet-accent) 65%,white); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
+}
 html.app-busy button:disabled { cursor:wait; }
 
 @media (max-width:980px) {
+  .combat-live-fab { bottom: calc(76px + env(safe-area-inset-bottom,0px)); }
+  .combat-live-panel { bottom: calc(132px + env(safe-area-inset-bottom,0px)); }
   .bottom-nav { justify-content:space-around; overflow:visible; }
   .bottom-nav .nav-btn { flex:1 1 0; min-width:0; white-space:nowrap; }
   .nav-more-drawer { display:block; }
 }
+.combat-map { margin: 14px 0; }
+.combat-map > summary { padding: 14px; border: 1px solid var(--line); cursor: pointer; font-weight: 800; }
+.combat-map[open] > summary { margin-bottom: 10px; }
+.combat-pending { margin: 14px 0; border-color: var(--accent); }
+.sheet-hero .pill { color: #41414b; border-color: #787883; }
 @media (max-width:640px) {
   .bottom-nav .nav-btn { padding:9px 4px; font-size:.68rem; }
   .nav-drawer-grid { grid-template-columns:1fr; }

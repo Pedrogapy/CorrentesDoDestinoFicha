@@ -36,9 +36,10 @@ export function combatLivePanelHtml({actions=[],effects=[],activeName='',master=
   const latest=ordered[0]||null;
   const recent=ordered.slice(1,6);
   const masterEffects=master ? (effects||[]).slice(0,10) : [];
-  const open = globalThis?.localStorage?.getItem('correntes-combat-live-open') === '1';
+  let open=false;
+  try { open=globalThis.localStorage?.getItem('correntes-combat-live-open')==='1'; } catch { /* Preferência opcional. */ }
   return `<button type="button" class="combat-live-fab" data-combat-live-toggle aria-expanded="${open?'true':'false'}">Agora</button>
-  <aside class="combat-live-panel ${open?'is-open':''}" data-combat-live-panel aria-hidden="${open?'false':'true'}" aria-label="Ações disponíveis agora">
+  <aside class="combat-live-panel ${open?'is-open':''}" data-combat-live-panel aria-hidden="${open?'false':'true'}" ${open?'':'inert'} aria-label="Ações disponíveis agora">
     <div class="combat-live-head"><div><div class="combat-live-eyebrow">AGORA NO COMBATE</div><strong>${esc(activeName||'Aguardando o Mestre')}</strong></div><button class="btn ghost" type="button" data-combat-live-close>Ocultar</button></div>
     <div class="combat-live-reaction ${reactionsEnabled?'allowed':'blocked'}">Reações: <strong>${reactionsEnabled?'liberadas':'bloqueadas pelo Mestre'}</strong></div>
     <section class="combat-live-available">
@@ -277,12 +278,14 @@ export function bindCombatLivePanel(root=document, options={}) {
   const setOpen=open=>{
     panel.classList.toggle('is-open',open);
     panel.setAttribute('aria-hidden',open?'false':'true');
+    panel.inert=!open;
+    if(!open && panel.contains(document.activeElement)) toggle.focus();
     toggle.setAttribute('aria-expanded',open?'true':'false');
     try{localStorage.setItem('correntes-combat-live-open',open?'1':'0');}catch(_){/* sem storage */}
   };
   toggle.onclick=()=>setOpen(!panel.classList.contains('is-open'));
   close?.addEventListener('click',()=>setOpen(false));
-  if(options.phase==='reaction') setOpen(true);
+  if(options.phase==='reaction' && options.pendingActionId) setOpen(true);
   if(options.role==='master'){
     const relevantActor=String(options.phase==='reaction'?(options.pendingActorId||''):(options.actorId||''));
     const reactionInput=[...root.querySelectorAll('[data-creactions][data-combat-actor]')]

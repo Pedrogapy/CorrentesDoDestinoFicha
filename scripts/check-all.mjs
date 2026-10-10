@@ -7,6 +7,7 @@ const checks = [
   ['sync-condition-catalog.mjs','--check'], ['check-improvised-combat.mjs'], ['check-improvised-ui.mjs'],
   ['check-effect-coverage.mjs'], ['check-table-control.mjs'],
   ['check-character-pdf.mjs'], ['check-ux-audit.mjs'],
+  ['check-audit-ui.mjs'], ['check-audit-db.mjs'], ['check-backup.mjs'],
 ];
 let failures=0;
 for (const [script,...args] of checks) {

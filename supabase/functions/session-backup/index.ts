@@ -1,3 +1,4 @@
+import { BACKUP_TABLES, readBackupTable, requirePrivateRepository } from './snapshot.js';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const corsHeaders = {
@@ -47,32 +48,11 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const reason = body?.reason || 'manual';
 
-    const tableNames = [
-      'campaigns',
-      'profiles',
-      'system_attributes',
-      'system_skills',
-      'system_conditions',
-      'characters',
-      'character_master_secrets',
-      'master_progress_tracks',
-      'abilities',
-      'vows',
-      'equipment',
-      'transformations',
-      'sessions',
-      'free_time_balances',
-      'training_tickets',
-      'master_requests',
-      'combat_encounters',
-      'combat_participants',
-      'roll_logs',
-      'audit_logs',
-    ];
+    const tableNames = BACKUP_TABLES;
 
     const snapshot: Record<string, unknown> = {
       format: 'correntes-do-destino-backup',
-      schema_version: 1,
+      schema_version: 2,
       generated_at: new Date().toISOString(),
       reason,
       generated_by: profile.display_name || userData.user.id,
@@ -80,9 +60,7 @@ Deno.serve(async (req) => {
     };
 
     for (const table of tableNames) {
-      const { data, error } = await admin.from(table).select('*');
-      if (error) throw new Error(`Falha ao ler ${table}: ${error.message}`);
-      (snapshot.tables as Record<string, unknown>)[table] = data;
+      (snapshot.tables as Record<string, unknown>)[table] = await readBackupTable(admin,table);
     }
 
     if (!githubToken || !githubRepo) {
@@ -106,6 +84,8 @@ Deno.serve(async (req) => {
       'User-Agent': 'correntes-do-destino-backup',
       'Content-Type': 'application/json',
     };
+
+    await requirePrivateRepository(fetch,`https://api.github.com/repos/${githubRepo}`,ghHeaders);
 
     let sha: string | undefined;
     const existing = await fetch(`${apiUrl}?ref=${encodeURIComponent(githubBranch)}`, { headers: ghHeaders });

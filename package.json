@@ -1,7 +1,7 @@
 {
   "name": "correntes-do-destino-ficha",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.8.8",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,11 +12,12 @@
     "test:system": "node scripts/check-system.mjs && node scripts/check-staff-v3.mjs"
   },
   "dependencies": {
-    "@supabase/supabase-js": "latest"
+    "@supabase/supabase-js": "2.112.2"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "^0.5.8",
-    "happy-dom": "^20.13.1",
-    "vite": "latest"
+    "@electric-sql/pglite": "0.5.8",
+    "esbuild": "0.28.2",
+    "happy-dom": "20.13.1",
+    "vite": "8.2.1"
   }
 }

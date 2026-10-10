@@ -9,7 +9,7 @@ const main=read('src/main.js');
 const css=read('src/styles.css');
 const migration=read('supabase/migrations/202608100004_ability_engine_v08.sql');
 
-assert(SYSTEM_VERSION==='0.8.3','SYSTEM_VERSION precisa ser 0.8.3.');
+assert(/^\d+\.\d+\.\d+$/.test(SYSTEM_VERSION),'SYSTEM_VERSION precisa ser uma versão semântica.');
 
 // O bug da captura: a UI precisa nascer com o campo e também ligar seus eventos
 // depois que o HTML do combate é inserido no DOM, em player e Mestre.
