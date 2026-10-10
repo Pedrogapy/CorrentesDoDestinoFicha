@@ -18,5 +18,8 @@
     "@electric-sql/pglite": "^0.5.8",
     "happy-dom": "^20.13.1",
     "vite": "latest"
+  },
+  "overrides": {
+    "source-map-js": "1.2.2"
   }
 }
