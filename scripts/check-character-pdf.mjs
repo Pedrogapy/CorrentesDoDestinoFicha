@@ -19,5 +19,6 @@ const ascii=new TextDecoder().decode(bytes);
 assert.ok(ascii.includes('/WinAnsiEncoding'),'PDF precisa declarar WinAnsi para português latino.');
 assert.ok(ascii.includes('xref')&&ascii.includes('startxref'),'PDF precisa possuir tabela xref válida.');
 assert.deepEqual(characterAccent(character),characterAccent({...character}),'A assinatura visual precisa ser determinística.');
-assert.notDeepEqual(characterAccent(character),characterAccent({...character,id:'22222222-2222-2222-2222-222222222222'}),'Fichas diferentes devem poder receber assinatura visual distinta.');
+const accentVariants=new Set(Array.from({length:24},(_,i)=>characterAccent({...character,id:`00000000-0000-0000-0000-${String(i).padStart(12,'0')}`}).hex));
+assert.ok(accentVariants.size>1,'A assinatura visual precisa variar entre fichas, ainda que a paleta possa se repetir.');
 console.log(`OK: exportação PDF válida (${bytes.length} bytes), acentos e assinatura visual determinística.`);
