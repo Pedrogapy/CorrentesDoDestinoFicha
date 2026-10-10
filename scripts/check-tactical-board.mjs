@@ -8,7 +8,7 @@ const sql = read('supabase/migrations/202608150001_tactical_board.sql');
 const css = read('src/styles.css');
 
 const checks = [
-  [/SYSTEM_VERSION = '\d+\.\d+\.\d+'/.test(system), 'versão semântica'],
+  [/export const SYSTEM_VERSION = '\d+\.\d+\.\d+'/.test(system), 'versão semântica válida'],
   [sql.includes('board_blocked_cells') && sql.includes('board_walls'), 'estado de terreno'],
   [sql.includes('board_x int') && sql.includes('board_y int'), 'posição por participante'],
   [sql.includes('move_combat_token') && sql.includes('Somente o Mestre pode mover peças'), 'movimento protegido no banco'],
@@ -29,4 +29,4 @@ if(failed.length){
   console.error('FALHA:', failed.join(', '));
   process.exit(1);
 }
-console.log('OK: tabuleiro tático, peças, paredes, quadrados bloqueados, visibilidade e proteção do Mestre validados para v0.8.3.');
+console.log('OK: tabuleiro tático, peças, paredes, quadrados bloqueados, visibilidade e proteção do Mestre validados.');

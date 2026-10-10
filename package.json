@@ -19,5 +19,8 @@
     "esbuild": "0.28.2",
     "happy-dom": "20.13.1",
     "vite": "8.2.1"
+  },
+  "overrides": {
+    "source-map-js": "1.2.2"
   }
 }

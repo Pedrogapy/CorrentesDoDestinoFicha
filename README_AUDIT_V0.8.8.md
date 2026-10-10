@@ -1,6 +1,6 @@
 # Auditoria Correntes do Destino — v0.8.8
 
-Data: 10/10/2026. Base inspecionada: `fb226a5` (main, v0.8.7).
+Data: 10/10/2026. Base inicial inspecionada: `fb226a5` (main, v0.8.7). Integrados também os cinco commits posteriores de main, até `0668c96`. As correções de testes antigos e de `source-map-js` chegaram igualmente à main durante esta auditoria; foram reconciliadas, preservando as atualizações de Actions e o override de segurança.
 
 A base já continha navegação agrupada, identidade visual por personagem e exportação PDF. Esta revisão verificou essas implementações, corrigiu problemas remanescentes e adicionou testes de comportamento. Não equivale a uma certificação de ausência de bugs.
 

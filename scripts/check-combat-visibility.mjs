@@ -9,7 +9,7 @@ const combat=fs.readFileSync(path.join(root,'src/lib/combat-ui.js'),'utf8');
 const api=fs.readFileSync(path.join(root,'src/lib/api.js'),'utf8');
 const sql=fs.readFileSync(path.join(root,'supabase/migrations/202608100005_combat_visibility_targeting.sql'),'utf8');
 
-assert(/^\d+\.\d+\.\d+$/.test(SYSTEM_VERSION),'SYSTEM_VERSION precisa ser uma versão semântica.');
+assert(/^\d+\.\d+\.\d+$/.test(SYSTEM_VERSION),'SYSTEM_VERSION precisa ser uma versão semântica válida.');
 assert(TARGET_RELATIONS.some(x=>x.key==='other'),'O sistema precisa da relaÃ§Ã£o "Qualquer outro participante".');
 assert(combat.includes('data-combat-search'), 'Seletor de participantes precisa possuir pesquisa por nome.');
 assert(combat.includes('createEncounterWithParticipants'), 'Tela do Mestre precisa iniciar combate com participantes selecionados.');
@@ -31,5 +31,5 @@ for(const token of [
   'create_combat_attack_v080_core',
 ]) assert(sql.includes(token),`Migration v0.8.1 nÃ£o contÃ©m: ${token}`);
 
-console.log('OK: seleção inicial, pesquisa, entrada no meio do combate, iniciativa visível e trava de alvos validadas para v0.8.3.');
+console.log(`OK: seleção inicial, pesquisa, entrada no meio do combate, iniciativa visível e trava de alvos validadas em ${SYSTEM_VERSION}.`);
 
