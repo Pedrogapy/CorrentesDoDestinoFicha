@@ -31,7 +31,7 @@ Fórmula de teste: `1d20 + floor(Atributo/2) + Perícia`.
 CA é o maior valor entre:
 
 - `10 + Mod. Destreza + Reflexos`
-- `10 + Mod. Resistência + Defender`
+- `10 + Mod. Força + Defender`
 - `10 + Mod. Resistência + Fortitude`
 - `10 + Mod. Controle Amaldiçoado + Reforço`
 

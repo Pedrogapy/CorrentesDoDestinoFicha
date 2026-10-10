@@ -107,12 +107,13 @@ try {
     await gm(()=>assert.rejects(improvise({kind:'narrative',target_id:null,public_text:''}),/narrativa/));
   });
   await test('efeito do catálogo reutiliza combat_effect_states e expira por turno', async () => gm(async () => {
-    const base=await rpc('combat_ca',[pc]);
+    const publicCa=async()=> (await query('select ca from get_combat_targets($1) where character_id=$2',[encounter,pc]))[0].ca;
+    const base=await publicCa();
     await improvise({kind:'effect',condition_key:'protected',remaining_turns:1,modifiers:{ca_bonus:2}});
-    assert.equal(await rpc('combat_ca',[pc]),base+2);
+    assert.equal(await publicCa(),base+2);
     const p=await participant(pc); await rpc('start_combat_turn',[p.id]); await rpc('end_combat_turn',[p.id]);
     assert.equal(await value("select count(*)::int as value from combat_effect_states where source_type='improvised'"),0);
-    assert.equal(await rpc('combat_ca',[pc]),base);
+    assert.equal(await publicCa(),base);
     await undo();
   }));
   await test('efeito personalizado não cadastra habilidade/condição e consome usos com Undo', async () => gm(async () => {

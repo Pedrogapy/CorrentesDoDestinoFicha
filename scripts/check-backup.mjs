@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import { BACKUP_TABLES,readBackupTable,requirePrivateRepository } from '../supabase/functions/session-backup/snapshot.js';
+for(const table of ['combat_actions','combat_usage','combat_effect_states','combat_undo_snapshots','character_cursed_body_techniques','ability_master_data']) assert.ok(BACKUP_TABLES.includes(table));
+const rows=Array.from({length:1205},(_,id)=>({id}));
+const client={from(){return {select(){return this;},order(){return this;},async range(start,end){return {data:rows.slice(start,Math.min(end+1,start+73))};}};}};
+assert.deepEqual(await readBackupTable(client,'characters'),rows,'Não trunca nem quando o servidor entrega menos que a página pedida');
+await assert.rejects(requirePrivateRepository(async()=>({ok:true,json:async()=>({private:false})}),'url',{}),/privado/);
+await assert.rejects(requirePrivateRepository(async()=>({ok:false,status:403}),'url',{}),/verificar/);
+await requirePrivateRepository(async()=>({ok:true,json:async()=>({private:true})}),'url',{});
+console.log('OK: backup completo, paginação e recusa de destino público.');

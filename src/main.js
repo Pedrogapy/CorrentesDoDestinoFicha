@@ -1,3 +1,5 @@
+import { createCombatRealtime } from './lib/combat-realtime.js';
+import { bindDialogFocus } from './lib/dialog-focus.js';
 import './styles.css';
 import { isConfigured, supabase } from './lib/supabase.js';
 import { signInCharacter, signUpCharacter, signOut } from './lib/auth.js';
@@ -29,6 +31,9 @@ import { renderPlayerEquipmentPage, renderMasterEquipmentManager, pendingEquipme
 import { downloadCharacterPdf, characterAccent } from './lib/character-pdf.js';
 
 const app = document.querySelector('#app');
+const pendingImages = new WeakMap();
+let combatRealtime;
+function stopCombatRealtime() { combatRealtime?.stop(); state.realtimeChannel=null; }
 
 const state = {
   authSession: null,
@@ -73,7 +78,7 @@ function normalizeUiSearch(value='') {
 }
 
 function navButtonHtml(key,name,active=false,extra='') {
-  return `<button class="nav-btn ${active?'active':''}" data-tab="${key}" ${extra}>${name}</button>`;
+  return `<button class="nav-btn ${active?'active':''}" data-tab="${key}" ${active?'aria-current="page"':''} ${extra}>${name}</button>`;
 }
 
 function groupedSidebarHtml(groups,activeKey) {
@@ -126,7 +131,7 @@ function showInfoModal(title, body) {
   const close=()=>{overlay.remove();previous?.focus?.();};
   overlay.querySelector('[data-close-modal]').onclick = close;
   overlay.onclick = (e) => { if (e.target === overlay) close(); };
-  overlay.onkeydown = e => { if(e.key==='Escape') close(); };
+  bindDialogFocus(overlay,close);
   overlay.querySelector('[data-close-modal]')?.focus();
 }
 
@@ -283,7 +288,7 @@ async function loadApp() {
     } else {
       state.character = await api.ensureMyCharacter(state.authSession.user);
       state.editingCharacter = structuredClone(state.character);
-      if (state.tab === 'master') state.tab = 'sheet';
+      if (!playerTabs.some(([key])=>key===state.tab)) state.tab = 'sheet';
     }
   });
 
@@ -312,7 +317,7 @@ function renderShell() {
       </header>
       <div class="layout">
         <aside class="sidebar">${groupedSidebarHtml(groups,state.tab)}</aside>
-        <main class="content" id="page"></main>
+        <main class="content" id="page" tabindex="-1"></main>
       </div>
       ${mobileNavigationHtml(groups,state.tab,isMaster)}
     </div>`;
@@ -328,6 +333,7 @@ function renderShell() {
       state.tab = button.dataset.tab;
       closeDrawer();
       renderShell();
+      document.querySelector('#page')?.focus({preventScroll:true});
     };
   });
   document.querySelector('[data-nav-more]')?.addEventListener('click',()=>{
@@ -339,6 +345,7 @@ function renderShell() {
   });
   document.querySelector('[data-nav-more-close]')?.addEventListener('click',closeDrawer);
   document.querySelector('#logout-btn').onclick = async () => {
+    stopCombatRealtime();
     await signOut();
     Object.assign(state, { authSession: null, profile: null, character: null, editingCharacter: null, tab: 'sheet' });
     authScreen();
@@ -349,8 +356,7 @@ function renderShell() {
 
 function renderCurrentPage() {
   if (state.tab !== 'combat' && state.realtimeChannel) {
-    supabase.removeChannel(state.realtimeChannel);
-    state.realtimeChannel = null;
+    stopCombatRealtime();
   }
   switch (state.tab) {
     case 'sheet': return renderSheetPage();
@@ -430,6 +436,7 @@ function renderCharacterEditor(character, isMasterEditor, root) {
       <div class="sheet-monogram" aria-hidden="true">${esc((character.first_name||character.nickname||'?').slice(0,1).toUpperCase())}</div>
       ${image}
       <div>
+        <button class="btn" type="button" data-sheet-download style="margin-bottom:12px">Baixar ficha em PDF</button>
         <div class="field-row">
           <label>Nome<input id="char-first" value="${esc(character.first_name)}" /></label>
           <label>Sobrenome<input id="char-last" value="${esc(character.last_name)}" /></label>
@@ -499,7 +506,7 @@ function renderCharacterEditor(character, isMasterEditor, root) {
     <div class="btn-row" style="margin-top:16px"><button class="btn primary" id="save-character">Salvar ficha</button><button class="btn" id="download-character-pdf">Baixar PDF</button><button class="btn ghost" id="export-character">Exportar JSON</button></div>
   `;
 
-  const rerender = () => renderCharacterEditor(character, isMasterEditor, root);
+  const rerender = () => { readCharacterEditorIntoModel(); renderCharacterEditor(character, isMasterEditor, root); };
   root.querySelectorAll('[data-attr-minus]').forEach(btn=>btn.onclick=()=>{ const k=btn.dataset.attrMinus; character.attributes[k]=Math.max(1,Number(character.attributes[k]||1)-1); rerender(); });
   root.querySelectorAll('[data-attr-plus]').forEach(btn=>btn.onclick=()=>{ const k=btn.dataset.attrPlus; const used=ATTRIBUTES.reduce((s,a)=>s+Number(character.attributes[a.key]||0),0); if(used<attributePointBudget(character.level) && character.attributes[k]<attributeCap(character.level)) character.attributes[k]++; rerender(); });
   root.querySelectorAll('[data-skill-minus]').forEach(btn=>btn.onclick=()=>{ const k=btn.dataset.skillMinus; character.skills[k]=Math.max(0,Number(character.skills[k]||0)-1); rerender(); });
@@ -540,7 +547,18 @@ function renderCharacterEditor(character, isMasterEditor, root) {
     return character;
   };
 
-  root.querySelector('#download-character-pdf').onclick=async()=>{
+  root.querySelectorAll('input:not([type="file"]),textarea,select').forEach(field=>field.addEventListener('input',readCharacterEditorIntoModel));
+  root.querySelector('#image-file').addEventListener('change',event=>{
+    const file=event.target.files?.[0];
+    if(file) pendingImages.set(character,file); else pendingImages.delete(character);
+  });
+  if(pendingImages.has(character)) {
+    const hint=document.createElement('span'); hint.className='muted small';
+    hint.textContent=`Imagem selecionada: ${pendingImages.get(character).name}`;
+    root.querySelector('#image-file').after(hint);
+  }
+
+  const downloadSheet=async()=>{
     readCharacterEditorIntoModel();
     const check=validateBuild(character);
     if(!check.valid) return toast(`Revise a ficha antes de gerar o PDF: ${check.errors[0]}`,'bad');
@@ -549,6 +567,8 @@ function renderCharacterEditor(character, isMasterEditor, root) {
     downloadCharacterPdf(snapshot);
     toast('PDF da ficha gerado.','good');
   };
+  root.querySelector('#download-character-pdf').onclick=downloadSheet;
+  root.querySelector('[data-sheet-download]').onclick=downloadSheet;
 
   root.querySelector('#save-character').onclick = async () => {
     readCharacterEditorIntoModel();
@@ -556,12 +576,13 @@ function renderCharacterEditor(character, isMasterEditor, root) {
     const check=validateBuild(character);
     if(!check.valid) return toast(check.errors[0],'bad');
 
-    const file = root.querySelector('#image-file').files?.[0];
+    const file = pendingImages.get(character) || root.querySelector('#image-file').files?.[0];
     if (file) {
       const userId = state.authSession.user.id;
       const result = await withBusy(()=>api.uploadCharacterImage(userId,character.id,file));
       character.image_url=result.publicUrl;
       character.image_path=result.path;
+      pendingImages.delete(character);
     }
 
     if(isMasterEditor) {
@@ -969,26 +990,13 @@ async function renderMasterSecret(root,character){
   bindConditionLinks(root);
 }
 function subscribeCombatRealtime(encounterId, rerender) {
-  if (state.realtimeChannel) {
-    supabase.removeChannel(state.realtimeChannel);
-    state.realtimeChannel = null;
-  }
-  if (!encounterId) return;
-  let timer;
-  const refresh = () => {
-    // Não força a tela de combate se o usuário já navegou para outra aba.
-    if (state.tab !== 'combat') return;
-    clearTimeout(timer);
-    timer = setTimeout(() => rerender(), 180);
-  };
-  state.realtimeChannel = supabase
-    .channel(`combat-${encounterId}-${state.profile.role}`)
-    // Participantes, ações e efeitos sinalizam mudanças pelo encontro. O player
-    // refaz as projeções seguras sem receber arrays privados pela assinatura.
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'roll_logs', filter: `encounter_id=eq.${encounterId}` }, refresh)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'combat_participants', filter: `encounter_id=eq.${encounterId}` }, refresh)
-    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'combat_encounters', filter: `id=eq.${encounterId}` }, refresh)
-    .subscribe();
+  if (state.tab !== 'combat') return;
+  combatRealtime ||= createCombatRealtime(supabase, {
+    canRefresh: () => state.tab === 'combat' && !state.loading && !document.querySelector('.overlay')
+      && !document.activeElement?.matches('input,select,textarea'),
+    onError: error => toast(error?.message || 'Não foi possível atualizar o combate.', 'bad'),
+  });
+  state.realtimeChannel = combatRealtime.subscribe(encounterId,state.profile.role,rerender);
 }
 
 async function boot(){

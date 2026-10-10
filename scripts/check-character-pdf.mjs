@@ -18,7 +18,19 @@ assert.ok(bytes.length>2500,'PDF ficou pequeno demais; conteúdo da ficha pode t
 const ascii=new TextDecoder().decode(bytes);
 assert.ok(ascii.includes('/WinAnsiEncoding'),'PDF precisa declarar WinAnsi para português latino.');
 assert.ok(ascii.includes('xref')&&ascii.includes('startxref'),'PDF precisa possuir tabela xref válida.');
+const xrefOffset=Number(ascii.match(/startxref\n(\d+)/)[1]);
+assert.equal(ascii.slice(xrefOffset,xrefOffset+4),'xref');
+const entries=ascii.slice(xrefOffset).split('\n');
+const objectCount=Number(entries[1].split(' ')[1]);
+for(let id=1;id<objectCount;id++) {
+  const offset=Number(entries[id+2].slice(0,10));
+  assert.ok(ascii.slice(offset).startsWith(`${id} 0 obj`),`xref do objeto ${id}`);
+}
+for(const stream of ascii.matchAll(/<< \/Length (\d+) >>\nstream\n([\s\S]*?)\nendstream/g)) {
+  assert.equal(new TextEncoder().encode(stream[2]).length,Number(stream[1]));
+}
+assert.ok(ascii.includes('Jo\\343o'),'Nome português preserva a codificação, não apenas o cabeçalho da fonte');
 assert.deepEqual(characterAccent(character),characterAccent({...character}),'A assinatura visual precisa ser determinística.');
-const accentVariants=new Set(Array.from({length:24},(_,i)=>characterAccent({...character,id:`00000000-0000-0000-0000-${String(i).padStart(12,'0')}`}).hex));
-assert.ok(accentVariants.size>1,'A assinatura visual precisa variar entre fichas, ainda que a paleta possa se repetir.');
+const palette = new Set(Array.from({length:64},(_,i)=>characterAccent({...character,id:`character-${i}`}).hex));
+assert.ok(palette.size >= 6,'Amostra de fichas deve distribuir as cores; colisões individuais são esperadas.');
 console.log(`OK: exportação PDF válida (${bytes.length} bytes), acentos e assinatura visual determinística.`);

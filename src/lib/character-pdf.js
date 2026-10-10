@@ -1,3 +1,4 @@
+import { FONT_WIDTHS } from './pdf-font-metrics.js';
 import {
   ABILITY_CATEGORIES,
   ATTRIBUTES,
@@ -40,7 +41,7 @@ export function characterAccent(character = {}) {
 }
 
 function normalizePrintable(value = '') {
-  return String(value ?? '')
+  return String(value ?? '').normalize('NFC')
     .replace(/\r/g, '')
     .replace(/\t/g, ' ')
     .replace(/[^\S\n]+/g, ' ')
@@ -137,28 +138,27 @@ class PdfBuilder {
   }
 }
 
-function wrapText(text, maxWidth, fontSize = 10, bold = false) {
-  const source = normalizePrintable(text);
-  if (!source) return [];
-  const approxCharWidth = fontSize * (bold ? 0.56 : 0.51);
-  const maxChars = Math.max(10, Math.floor(maxWidth / approxCharWidth));
-  const paragraphs = source.split(/\n+/);
-  const lines = [];
-  for (const paragraph of paragraphs) {
-    const words = paragraph.split(/\s+/).filter(Boolean);
-    if (!words.length) { lines.push(''); continue; }
-    let line = '';
-    for (const word of words) {
-      if (word.length > maxChars) {
-        if (line) { lines.push(line); line = ''; }
-        for (let i = 0; i < word.length; i += maxChars) lines.push(word.slice(i, i + maxChars));
-        continue;
+function textWidth(text, size, bold=false) {
+  const widths=FONT_WIDTHS[bold?'Helvetica-Bold':'Helvetica'];
+  return Array.from(String(text)).reduce((sum,ch)=>sum+widths[byteForChar(ch)],0)*size/1000;
+}
+
+function wrapText(text, maxWidth, fontSize=10, bold=false) {
+  const source=normalizePrintable(text);
+  if(!source) return [];
+  const lines=[];
+  for(const paragraph of source.split('\n')) {
+    let line='';
+    for(const word of paragraph.split(/\s+/).filter(Boolean)) {
+      if(line && textWidth(line+' '+word,fontSize,bold)>maxWidth) { lines.push(line); line=''; }
+      let chunk='';
+      for(const ch of word) {
+        if(chunk && textWidth(chunk+ch,fontSize,bold)>maxWidth) { lines.push(chunk); chunk=''; }
+        chunk+=ch;
       }
-      const next = line ? `${line} ${word}` : word;
-      if (next.length > maxChars && line) { lines.push(line); line = word; }
-      else line = next;
+      line=line?line+' '+chunk:chunk;
     }
-    if (line) lines.push(line);
+    lines.push(line);
   }
   return lines;
 }
@@ -172,7 +172,7 @@ function abilityCategoryName(key) {
 }
 
 function statusLabel(status = '') {
-  return ({ approved: 'Aprovada', pending: 'Pendente', rejected: 'Rejeitada', disabled: 'Desativada', draft: 'Rascunho' })[status] || status || 'Sem estado';
+  return ({ active: 'Ativo', player_disabled: 'Desativado pelo jogador', master_locked: 'Bloqueado pelo mestre', available_reactivation: 'Pode ser reativado', approved: 'Aprovada', pending: 'Pendente', rejected: 'Rejeitada', disabled: 'Desativada', draft: 'Rascunho' })[status] || status || 'Sem estado';
 }
 
 function sanitizeFilename(value = 'ficha') {
@@ -201,7 +201,8 @@ class SheetLayout {
     this.y = MARGIN;
     this.pdf.rect(this.page, 0, 0, PAGE_W, 7, { fill: this.accent });
     this.pdf.text(this.page, 'CORRENTES DO DESTINO', MARGIN, 29, 8, { bold: true, color: this.accent });
-    this.pdf.text(this.page, `Ficha de ${safeName(this.character)}`, 360, 29, 8, { color: [96, 96, 104] });
+    const header=wrapText(`Ficha de ${safeName(this.character)}`,PAGE_W-360-MARGIN,8)[0];
+    this.pdf.text(this.page, header, 360, 29, 8, { color: [96, 96, 104] });
     this.pdf.text(this.page, String(this.pageNumber).padStart(2, '0'), PAGE_W - MARGIN - 14, PAGE_H - 24, 8, { bold: true, color: [128, 128, 136] });
     this.y = 48;
   }
@@ -211,27 +212,27 @@ class SheetLayout {
   }
 
   title(text, subtitle = '') {
-    this.ensure(70);
-    this.pdf.text(this.page, text.toUpperCase(), MARGIN, this.y + 17, 25, { bold: true, color: [18, 18, 22] });
-    if (subtitle) this.pdf.text(this.page, subtitle, MARGIN, this.y + 38, 9, { color: [94, 94, 102] });
-    this.pdf.line(this.page, MARGIN, this.y + 48, PAGE_W - MARGIN, this.y + 48, { color: this.accent, width: 1.4 });
-    this.y += 62;
+    this.paragraph(text.toUpperCase(),{size:25,bold:true,color:[18,18,22],gap:8});
+    if(subtitle) this.paragraph(subtitle,{size:9,color:[94,94,102],gap:8});
+    this.ensure(20);
+    this.pdf.line(this.page,MARGIN,this.y,PAGE_W-MARGIN,this.y,{color:this.accent,width:1.4});
+    this.y+=18;
   }
 
   section(text) {
-    this.ensure(32);
+    this.ensure(62);
     this.pdf.rect(this.page, MARGIN, this.y, 5, 18, { fill: this.accent });
     this.pdf.text(this.page, text.toUpperCase(), MARGIN + 12, this.y + 13, 11, { bold: true, color: [28, 28, 33] });
     this.y += 28;
   }
 
-  paragraph(text, { size = 9, color = [45, 45, 50], gap = 7, bold = false } = {}) {
-    const lines = wrapText(text, CONTENT_W, size, bold);
+  paragraph(text, { size = 9, color = [45, 45, 50], gap = 7, bold = false, x = MARGIN, width = CONTENT_W } = {}) {
+    const lines = wrapText(text, width, size, bold);
     if (!lines.length) return;
     const lineHeight = size * 1.38;
     for (const line of lines) {
       this.ensure(lineHeight + 2);
-      this.pdf.text(this.page, line, MARGIN, this.y + size, size, { bold, color });
+      this.pdf.text(this.page, line, x, this.y + size, size, { bold, color });
       this.y += lineHeight;
     }
     this.y += gap;
@@ -239,7 +240,7 @@ class SheetLayout {
 
   labelValue(label, value, { x = MARGIN, width = CONTENT_W, size = 9 } = {}) {
     const labelW = Math.min(width * 0.35, 145);
-    const valueText = normalizePrintable(value || '—');
+    const valueText = normalizePrintable(value ?? '—');
     const lines = wrapText(valueText, width - labelW - 8, size, false);
     if (lines.length <= 8) {
       const height = Math.max(18, lines.length * size * 1.35 + 5);
@@ -277,27 +278,17 @@ class SheetLayout {
         const valueX=Math.max(x + colW * 0.58, x + colW - 7 - valueWidth);
         this.pdf.text(this.page, valueText, valueX, this.y + 12, 8.2, { bold: true, color: row.accent ? this.accent : [72, 72, 80] });
       }
-      this.y += 24;
+      this.y += 22;
     }
     this.y += 4;
   }
 
   item(title, meta = '', body = '') {
-    const metaLines = wrapText(meta, CONTENT_W - 20, 7.4);
-    const bodyLines = wrapText(body, CONTENT_W - 20, 8.6);
-    this.ensure(36 + metaLines.length * 10);
-    this.pdf.rect(this.page, MARGIN, this.y, CONTENT_W, 28 + metaLines.length * 10, { fill: [249, 249, 250], stroke: [222, 222, 226], width: 0.5 });
-    this.pdf.rect(this.page, MARGIN, this.y, 3, 28 + metaLines.length * 10, { fill: this.accent });
-    this.pdf.text(this.page, title, MARGIN + 10, this.y + 14, 9.3, { bold: true, color: [25, 25, 30] });
-    let yy = this.y + 25;
-    for (const line of metaLines) { this.pdf.text(this.page, line, MARGIN + 10, yy, 7.4, { color: [102, 102, 110] }); yy += 10; }
-    this.y += 32 + metaLines.length * 10;
-    for (const line of bodyLines) {
-      this.ensure(14);
-      this.pdf.text(this.page, line, MARGIN + 10, this.y + 8.6, 8.6, { color: [48, 48, 54] });
-      this.y += 11.2;
-    }
-    this.y += 9;
+    this.ensure(65);
+    this.pdf.rect(this.page,MARGIN,this.y,3,18,{fill:this.accent});
+    this.paragraph(title,{size:10,bold:true,gap:5,color:this.accent,x:MARGIN+10,width:CONTENT_W-10});
+    if(meta) this.paragraph(meta,{size:8,color:[85,85,93],gap:5});
+    if(body) this.paragraph(body,{size:9,gap:12});
   }
 
 }
@@ -391,6 +382,6 @@ export function downloadCharacterPdf(snapshot = {}) {
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 0);
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
   return bytes;
 }

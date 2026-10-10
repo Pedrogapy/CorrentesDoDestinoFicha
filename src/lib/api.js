@@ -480,14 +480,19 @@ async function discardCombatUndo(snapshotId) {
 async function withCombatUndo(encounterId, label, operation) {
   if (!encounterId) return operation();
   const snapshotId = await beginCombatUndo(encounterId, label);
+  let result;
   try {
-    const result = await operation();
-    await commitCombatUndo(snapshotId);
-    return result;
+    result = await operation();
   } catch (error) {
     await discardCombatUndo(snapshotId);
     throw error;
   }
+  try { await commitCombatUndo(snapshotId); }
+  catch (cause) {
+    // A mutação já ocorreu. Não apague a recuperação nem sugira repetir o golpe.
+    throw new Error('A ação foi aplicada, mas não foi possível confirmar o registro de Desfazer. Atualize o combate antes de continuar; não repita a ação.', { cause });
+  }
+  return result;
 }
 
 export async function getLatestCombatUndo(encounterId=null) {
@@ -582,6 +587,12 @@ export async function getCombatParticipants(encounterId) {
 }
 
 export async function updateCombatParticipant(id, changes, encounterId=null) {
+  for (const key of ['current_ps','current_ea','current_pa']) {
+    if (key in changes && (!Number.isInteger(changes[key]) || changes[key] < 0)) {
+      throw new Error('PS, EA e PA precisam ser números inteiros iguais ou maiores que zero.');
+    }
+  }
+  if ('current_ps' in changes) changes={...changes,defeated:changes.current_ps===0};
   return withCombatUndo(encounterId, 'Ajustar recursos de combate', async()=>{
     const { data, error } = await supabase.from('combat_participants').update(changes).eq('id', id).select('id,encounter_id').single();
     if (error) throw error;

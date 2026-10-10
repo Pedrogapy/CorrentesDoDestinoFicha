@@ -13,13 +13,14 @@ for(const token of ['playerNavGroups','masterNavGroups','data-nav-more','renderM
   assert.ok(main.includes(token),`Navegação reorganizada ausente: ${token}`);
 assert.ok(main.includes('downloadCharacterPdf'),'Ficha não oferece exportação PDF.');
 assert.ok(main.includes('hasApprovedManifestation'),'Criação de ficha filha precisa refletir o requisito de Manifestação aprovada.');
-assert.ok(main.includes("table: 'combat_participants'"),'Realtime precisa reagir a mudanças manuais de PS/EA/PA/visibilidade/posição.');
+assert.ok(fs.readFileSync('src/lib/combat-realtime.js','utf8').includes("'combat_participants'"),'Realtime precisa reagir a mudanças manuais de PS/EA/PA/visibilidade/posição.');
 assert.ok(main.includes('data-master-entity-search'),'Mestre precisa conseguir localizar fichas rapidamente.');
 assert.ok(combat.includes("state.testCharacterId=characterId"),'Teste secreto do Mestre precisa preservar a entidade selecionada.');
 assert.ok(combat.includes('combat-history'),'Histórico do combate deve ficar separado do fluxo atual.');
 assert.ok(panel.includes("options.phase==='reaction'"),'Painel Agora deve abrir automaticamente em uma reação pendente.');
 assert.ok(api.includes("onConflict: 'character_id,key'"),'Progresso oculto precisa atualizar pela chave, não duplicar registros.');
-assert.ok(system.includes("SYSTEM_VERSION = '0.8.7'"),'Versão visível do sistema precisa acompanhar a revisão atual.');
+const packageVersion=JSON.parse(fs.readFileSync('package.json','utf8')).version;
+assert.ok(system.includes(`SYSTEM_VERSION = '${packageVersion}'`),'Versão visível precisa acompanhar o pacote.');
 assert.ok(system.includes("name: 'Controle Amaldiçoado'"),'Terminologia de Controle Amaldiçoado precisa coincidir com o livro.');
 assert.ok(system.includes("['defend', 'Defender'"),'Perícia Defender precisa coincidir com o livro.');
 assert.ok(css.includes('.nav-section-label')&&css.includes('.sheet-signature'),'CSS da nova hierarquia e identidade individual ausente.');
